@@ -2,7 +2,8 @@ import SwiftUI
 
 // MARK: - AddSetView
 // Sheet for configuring a single workout set before adding it to the workout.
-// Supports single exercises and supersets.
+// Supports single exercises and supersets, each performed for one or more rounds
+// with per-round targets (reps/time, weight, effort) and per-round rest.
 
 struct AddSetView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,7 +14,6 @@ struct AddSetView: View {
 
     @State private var draft: DraftWorkoutSet
     @State private var showingExercisePicker = false
-    @State private var editingExerciseIndex: Int? = nil
 
     // MARK: - Rest options
 
@@ -36,19 +36,18 @@ struct AddSetView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
-                    // Exercise list
                     exerciseSection
 
-                    // Rest time
-                    restSection
+                    if !draft.exercises.isEmpty {
+                        roundsSection
+                    }
 
-                    // Save button
                     Button(existingDraft == nil ? "Add Set" : "Update Set") {
                         onSave(draft)
                         dismiss()
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(draft.exercises.isEmpty)
+                    .disabled(draft.exercises.isEmpty || draft.rounds.isEmpty)
                     .padding(.top, Spacing.xs)
                 }
                 .padding(Spacing.md)
@@ -62,8 +61,7 @@ struct AddSetView: View {
             }
             .sheet(isPresented: $showingExercisePicker) {
                 ExercisePickerView { exercise in
-                    let draft = DraftExerciseInSet(exercise: exercise)
-                    self.draft.exercises.append(draft)
+                    draft.addExercise(exercise)
                 }
             }
         }
@@ -119,97 +117,197 @@ struct AddSetView: View {
     }
 
     private func exerciseRow(index: Int, draftEx: DraftExerciseInSet) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            // Name + remove button
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(draftEx.exercise.name)
-                        .font(.sfHeadline)
-                    Text(draftEx.exercise.muscleGroup.displayName)
-                        .font(.sfCaption)
-                        .foregroundStyle(Color.sfAccent)
-                }
-                Spacer()
-                Button {
-                    draft.exercises.remove(at: index)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color.sfMuted)
-                        .font(.system(size: 20))
-                }
-                .buttonStyle(.plain)
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(draftEx.exercise.name)
+                    .font(.sfHeadline)
+                Text(draftEx.exercise.muscleGroup.displayName)
+                    .font(.sfCaption)
+                    .foregroundStyle(Color.sfAccent)
             }
 
-            // Time-based toggle
+            Spacer()
+
+            // Timed vs reps toggle (applies to this exercise across all rounds)
             Toggle(isOn: binding(isTimeBased: index)) {
-                Text("Timed exercise")
+                Text("Timed")
                     .font(.sfCaption)
                     .foregroundStyle(.secondary)
             }
+            .toggleStyle(.button)
             .tint(Color.sfAccent)
 
-            // Reps or Time stepper
-            if draft.exercises[index].isTimeBased {
-                stepperRow(
-                    label: "Duration",
-                    value: binding(time: index),
-                    range: 10...300,
-                    step: 5,
-                    format: { "\($0)s" }
-                )
-            } else {
-                stepperRow(
-                    label: "Target Reps",
-                    value: binding(reps: index),
-                    range: 1...50,
-                    step: 1,
-                    format: { "\($0) reps" }
-                )
+            Button {
+                draft.removeExercise(at: index)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(Color.sfMuted)
+                    .font(.system(size: 20))
             }
-
-            // Effort level
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Effort")
-                        .font(.sfCaption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(Int(draft.exercises[index].effortLevel * 100))% of 1RM")
-                        .font(.sfCaption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.sfAccent)
-                }
-                Slider(
-                    value: binding(effort: index),
-                    in: 0.4...1.0,
-                    step: 0.05
-                )
-                .tint(Color.sfAccent)
-            }
+            .buttonStyle(.plain)
         }
         .padding(Spacing.md)
         .background(Color.sfSurface)
         .clipShape(RoundedRectangle(cornerRadius: Radius.md))
     }
 
-    // MARK: - Rest Section
+    // MARK: - Rounds Section
 
-    private var restSection: some View {
+    private var roundsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            sectionHeader("Rest Between Sets", badge: nil)
+            sectionHeader("Sets", badge: nil, trailing: draft.rounds.count > 1 ? "\(draft.rounds.count) sets" : nil)
 
+            ForEach(Array(draft.rounds.enumerated()), id: \.element.id) { roundIndex, _ in
+                roundCard(roundIndex: roundIndex)
+            }
+
+            HStack(spacing: Spacing.sm) {
+                Button {
+                    draft.addRound()
+                } label: {
+                    Label("Add Set", systemImage: "plus.circle.fill")
+                        .font(.sfSubhead)
+                        .foregroundStyle(Color.sfAccent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.sm)
+                        .background(Color.sfAccent.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func roundCard(roundIndex: Int) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            // Header: Set number + delete
+            HStack {
+                Text("Set \(roundIndex + 1)")
+                    .font(.sfSubhead)
+                    .fontWeight(.semibold)
+                Spacer()
+                if draft.rounds.count > 1 {
+                    Button {
+                        draft.removeRound(at: roundIndex)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.sfDanger)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Per-exercise targets for this round
+            ForEach(Array(draft.exercises.enumerated()), id: \.element.id) { exIndex, ex in
+                if exIndex < draft.rounds[roundIndex].targets.count {
+                    targetEditor(roundIndex: roundIndex, exIndex: exIndex, draftEx: ex)
+                    if draft.isSuperset && exIndex < draft.exercises.count - 1 {
+                        Divider()
+                    }
+                }
+            }
+
+            Divider()
+
+            // Rest for this round
+            restPicker(roundIndex: roundIndex)
+        }
+        .padding(Spacing.md)
+        .background(Color.sfSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+    }
+
+    private func targetEditor(roundIndex: Int, exIndex: Int, draftEx: DraftExerciseInSet) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            if draft.isSuperset {
+                Text(draftEx.exercise.name)
+                    .font(.sfCaption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.sfAccent)
+            }
+
+            // Reps or Duration + Weight, side by side
+            HStack(spacing: Spacing.md) {
+                if draftEx.isTimeBased {
+                    stepperRow(
+                        label: "Time",
+                        value: binding(time: roundIndex, exIndex),
+                        range: 5...600,
+                        step: 5,
+                        format: { "\($0)s" }
+                    )
+                } else {
+                    stepperRow(
+                        label: "Reps",
+                        value: binding(reps: roundIndex, exIndex),
+                        range: 1...50,
+                        step: 1,
+                        format: { "\($0)" }
+                    )
+                }
+
+                weightField(roundIndex: roundIndex, exIndex: exIndex)
+            }
+
+            // Effort level
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Effort")
+                        .font(.sfCaption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int(draft.rounds[roundIndex].targets[exIndex].effortLevel * 100))% of 1RM")
+                        .font(.sfCaption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.sfAccent)
+                }
+                Slider(value: binding(effort: roundIndex, exIndex), in: 0.4...1.0, step: 0.05)
+                    .tint(Color.sfAccent)
+            }
+        }
+    }
+
+    private func weightField(roundIndex: Int, exIndex: Int) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Weight")
+                .font(.sfCaption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField("—", text: binding(weight: roundIndex, exIndex))
+                    .keyboardType(.decimalPad)
+                    .font(.sfSubhead)
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+                    .frame(minWidth: 44)
+                Text("lbs")
+                    .font(.sfCaption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xs)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm))
+        }
+    }
+
+    private func restPicker(roundIndex: Int) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text("Rest after this set")
+                .font(.sfCaption)
+                .foregroundStyle(.secondary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.xs), count: 3), spacing: Spacing.xs) {
                 ForEach(restOptions, id: \.seconds) { option in
-                    let isSelected = draft.restSeconds == option.seconds
+                    let isSelected = draft.rounds[roundIndex].restSeconds == option.seconds
                     Button(option.label) {
-                        draft.restSeconds = option.seconds
+                        draft.rounds[roundIndex].restSeconds = option.seconds
                     }
-                    .font(.sfSubhead)
+                    .font(.sfCaption)
                     .fontWeight(isSelected ? .semibold : .regular)
                     .foregroundStyle(isSelected ? .white : .primary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.sm)
-                    .background(isSelected ? Color.sfAccent : Color.sfSurface)
+                    .padding(.vertical, Spacing.xs)
+                    .background(isSelected ? Color.sfAccent : Color(.systemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: Radius.sm))
                     .animation(.easeOut(duration: 0.15), value: isSelected)
                 }
@@ -219,7 +317,7 @@ struct AddSetView: View {
 
     // MARK: - Helpers
 
-    private func sectionHeader(_ title: String, badge: String?) -> some View {
+    private func sectionHeader(_ title: String, badge: String?, trailing: String? = nil) -> some View {
         HStack(spacing: Spacing.xs) {
             Text(title)
                 .font(.sfSubhead)
@@ -236,29 +334,47 @@ struct AddSetView: View {
                     .background(Color.sfAccent.opacity(0.15))
                     .clipShape(Capsule())
             }
+            Spacer()
+            if let trailing {
+                Text(trailing)
+                    .font(.sfCaption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
-    // MARK: - Bindings into draft.exercises[index]
+    // MARK: - Bindings into draft.rounds[roundIndex].targets[exIndex]
 
-    private func binding(reps index: Int) -> Binding<Int> {
+    private func binding(reps roundIndex: Int, _ exIndex: Int) -> Binding<Int> {
         Binding(
-            get: { draft.exercises[index].targetReps ?? 8 },
-            set: { draft.exercises[index].targetReps = $0 }
+            get: { draft.rounds[roundIndex].targets[exIndex].targetReps ?? 8 },
+            set: { draft.rounds[roundIndex].targets[exIndex].targetReps = $0 }
         )
     }
 
-    private func binding(time index: Int) -> Binding<Int> {
+    private func binding(time roundIndex: Int, _ exIndex: Int) -> Binding<Int> {
         Binding(
-            get: { draft.exercises[index].targetTime ?? 30 },
-            set: { draft.exercises[index].targetTime = $0 }
+            get: { draft.rounds[roundIndex].targets[exIndex].targetTime ?? 30 },
+            set: { draft.rounds[roundIndex].targets[exIndex].targetTime = $0 }
         )
     }
 
-    private func binding(effort index: Int) -> Binding<Double> {
+    private func binding(effort roundIndex: Int, _ exIndex: Int) -> Binding<Double> {
         Binding(
-            get: { draft.exercises[index].effortLevel },
-            set: { draft.exercises[index].effortLevel = $0 }
+            get: { draft.rounds[roundIndex].targets[exIndex].effortLevel },
+            set: { draft.rounds[roundIndex].targets[exIndex].effortLevel = $0 }
+        )
+    }
+
+    private func binding(weight roundIndex: Int, _ exIndex: Int) -> Binding<String> {
+        Binding(
+            get: {
+                if let w = draft.rounds[roundIndex].targets[exIndex].targetWeight, w > 0 {
+                    return w.weightFormatted
+                }
+                return ""
+            },
+            set: { draft.rounds[roundIndex].targets[exIndex].targetWeight = Double($0) }
         )
     }
 
@@ -278,11 +394,10 @@ struct AddSetView: View {
         step: Int,
         format: (Int) -> String
     ) -> some View {
-        HStack {
+        VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.sfCaption)
                 .foregroundStyle(.secondary)
-            Spacer()
             HStack(spacing: Spacing.sm) {
                 Button {
                     if value.wrappedValue - step >= range.lowerBound {
@@ -290,7 +405,7 @@ struct AddSetView: View {
                     }
                 } label: {
                     Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 24))
+                        .font(.system(size: 22))
                         .foregroundStyle(Color.sfAccent)
                 }
                 .buttonStyle(.plain)
@@ -299,7 +414,7 @@ struct AddSetView: View {
                     .font(.sfSubhead)
                     .fontWeight(.semibold)
                     .monospacedDigit()
-                    .frame(minWidth: 70, alignment: .center)
+                    .frame(minWidth: 44, alignment: .center)
 
                 Button {
                     if value.wrappedValue + step <= range.upperBound {
@@ -307,7 +422,7 @@ struct AddSetView: View {
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 24))
+                        .font(.system(size: 22))
                         .foregroundStyle(Color.sfAccent)
                 }
                 .buttonStyle(.plain)

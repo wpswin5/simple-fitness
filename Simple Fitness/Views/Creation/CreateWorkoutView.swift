@@ -11,8 +11,19 @@ struct CreateWorkoutView: View {
     @State private var editingDraft: DraftWorkoutSet? = nil
     @State private var showingError = false
 
-    init(editing workout: Workout? = nil) {
+    /// Called after a successful save (used by the AI generation flow to
+    /// dismiss its own sheet). Nil for normal create/edit flows.
+    var onSaved: (() -> Void)? = nil
+
+    init(editing workout: Workout? = nil, onSaved: (() -> Void)? = nil) {
         _vm = State(wrappedValue: workout.map { CreateWorkoutViewModel(editing: $0) } ?? CreateWorkoutViewModel())
+        self.onSaved = onSaved
+    }
+
+    /// Create-mode pre-seeded with generated draft content, for review before saving.
+    init(prefilled: MappedWorkout, onSaved: (() -> Void)? = nil) {
+        _vm = State(wrappedValue: CreateWorkoutViewModel(prefilled: prefilled))
+        self.onSaved = onSaved
     }
 
     // MARK: - Body
@@ -26,11 +37,6 @@ struct CreateWorkoutView: View {
 
                     // Sets
                     setsSection
-
-                    // Rounds (setRepetitions)
-                    if vm.draftSets.count > 0 {
-                        roundsSection
-                    }
 
                     // Summary
                     if !vm.draftSets.isEmpty {
@@ -202,15 +208,18 @@ struct CreateWorkoutView: View {
                             .font(.sfCaption2)
                             .foregroundStyle(Color.sfAccent)
                     }
-                    Text(draft.displayReps)
+                    Text(draft.setCountLabel)
                         .font(.sfCaption)
                         .foregroundStyle(.secondary)
-                    Text("·")
-                        .font(.sfCaption)
-                        .foregroundStyle(.secondary)
-                    Text("Rest \(draft.restSeconds)s")
-                        .font(.sfCaption)
-                        .foregroundStyle(.secondary)
+                    if !draft.roundsDetail.isEmpty {
+                        Text("·")
+                            .font(.sfCaption)
+                            .foregroundStyle(.secondary)
+                        Text(draft.roundsDetail)
+                            .font(.sfCaption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
 
@@ -251,62 +260,13 @@ struct CreateWorkoutView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radius.md))
     }
 
-    // MARK: - Rounds Section
-
-    private var roundsSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            sectionHeader("Rounds")
-
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Repeat all sets")
-                        .font(.sfSubhead)
-                    Text(vm.setRepetitions == 1
-                         ? "Complete each set once"
-                         : "Complete all sets \(vm.setRepetitions) times")
-                        .font(.sfCaption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                HStack(spacing: Spacing.md) {
-                    Button {
-                        if vm.setRepetitions > 1 { vm.setRepetitions -= 1 }
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(vm.setRepetitions > 1 ? Color.sfAccent : .secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Text("\(vm.setRepetitions)×")
-                        .font(.sfCounter)
-                        .fontWeight(.bold)
-                        .monospacedDigit()
-                        .frame(minWidth: 40, alignment: .center)
-
-                    Button {
-                        if vm.setRepetitions < 10 { vm.setRepetitions += 1 }
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(Color.sfAccent)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(Spacing.md)
-            .background(Color.sfSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radius.md))
-        }
-    }
-
     // MARK: - Summary Card
 
     private var summaryCard: some View {
         HStack(spacing: 0) {
             summaryItem(
                 icon: "list.number",
-                value: "\(vm.draftSets.count * vm.setRepetitions)",
+                value: "\(vm.totalSetCount)",
                 label: "Total Sets"
             )
             Divider().frame(height: 36)
@@ -354,6 +314,7 @@ struct CreateWorkoutView: View {
 
     private func saveWorkout() {
         if vm.save(context: modelContext) {
+            onSaved?()
             dismiss()
         } else {
             showingError = vm.errorMessage != nil
