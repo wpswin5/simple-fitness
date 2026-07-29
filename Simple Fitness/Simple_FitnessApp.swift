@@ -13,40 +13,27 @@ struct Simple_FitnessApp: App {
     let modelContainer: ModelContainer
 
     init() {
-        let schema = Schema([
-            Exercise.self,
-            ExerciseInSet.self,
-            ExerciseTarget.self,
-            SetRound.self,
-            WorkoutSet.self,
-            Workout.self,
-            ProgramDay.self,
-            ProgramDayActivity.self,
-            ProgramWeek.self,
-            Program.self,
-            UserProfile.self,
-            ProgramRegistration.self,
-            WorkoutLog.self,
-            WorkoutSetLog.self,
-            ExerciseLog.self,
-            // Cardio
-            CardioLog.self,
-            CardioSplit.self,
-            SwimSet.self,
-            CardioTemplate.self,
-            CardioTemplateInterval.self,
-        ])
+        // Versioned schema (see SchemaVersions.swift) so future model changes can
+        // migrate the store instead of wiping it.
+        let schema = Schema(versionedSchema: SimpleFitnessSchemaV1.self)
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
-            modelContainer = try ModelContainer(for: schema, configurations: [config])
+            modelContainer = try ModelContainer(
+                for: schema,
+                migrationPlan: SimpleFitnessMigrationPlan.self,
+                configurations: [config]
+            )
         } catch {
-            // Pre-release MVP: no versioned migration plan yet. If the persistent store
-            // is incompatible with the current schema (e.g. after a model change), wipe
-            // the store and rebuild it once rather than hard-crashing every launch.
-            // DEBUG seed data repopulates automatically.
+            // Last-resort catch: if a store is somehow unreadable even with the
+            // migration plan, wipe it and rebuild once rather than hard-crashing
+            // every launch. This should be unreachable in normal operation now.
             Self.deleteStoreFiles(for: config)
             do {
-                modelContainer = try ModelContainer(for: schema, configurations: [config])
+                modelContainer = try ModelContainer(
+                    for: schema,
+                    migrationPlan: SimpleFitnessMigrationPlan.self,
+                    configurations: [config]
+                )
             } catch {
                 fatalError("Could not create ModelContainer after resetting store: \(error)")
             }
