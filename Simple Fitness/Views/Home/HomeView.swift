@@ -14,6 +14,9 @@ struct HomeView: View {
     @Query(sort: \ProgramRegistration.startDate, order: .reverse) private var registrations: [ProgramRegistration]
 
     @State private var activeWorkout: Workout?
+    @State private var cardioToStart: CardioTemplate?
+    @State private var cardioToLog: CardioTemplate?
+    @State private var showingLogCardio = false
 
     // MARK: - Active Program
 
@@ -21,11 +24,12 @@ struct HomeView: View {
         registrations.first { $0.isActive }
     }
 
-    private var todaysProgramWorkout: Workout? {
-        guard let reg = activeRegistration, let program = reg.program else { return nil }
+    /// Today's scheduled activities for the current program week.
+    private var todaysActivities: [ProgramDayActivity] {
+        guard let reg = activeRegistration, let program = reg.program else { return [] }
         let weekIndex = reg.currentWeek - 1
         let sortedWeeks = program.sortedWeeks
-        guard weekIndex < sortedWeeks.count else { return nil }
+        guard weekIndex < sortedWeeks.count else { return [] }
         let week = sortedWeeks[weekIndex]
         let weekday = Calendar.current.component(.weekday, from: Date())
         let dayMap: [Int: DayOfWeek] = [
@@ -33,9 +37,16 @@ struct HomeView: View {
             5: .thursday, 6: .friday, 7: .saturday
         ]
         guard let today = dayMap[weekday],
-              let day = week.days.first(where: { $0.dayOfWeek == today }) else { return nil }
-        // Return the first strength workout scheduled today
-        return day.sortedActivities.compactMap { $0.workout }.first
+              let day = week.days.first(where: { $0.dayOfWeek == today }) else { return [] }
+        return day.sortedActivities
+    }
+
+    private var todaysProgramWorkout: Workout? {
+        todaysActivities.compactMap { $0.workout }.first
+    }
+
+    private var todaysProgramCardio: CardioTemplate? {
+        todaysActivities.compactMap { $0.cardioTemplate }.first
     }
 
     // MARK: - Body
@@ -64,6 +75,12 @@ struct HomeView: View {
             .fullScreenCover(item: $activeWorkout) { workout in
                 ActiveWorkoutView(workout: workout)
             }
+            .fullScreenCover(item: $cardioToStart) { template in
+                ActiveCardioView(template: template)
+            }
+            .sheet(isPresented: $showingLogCardio) {
+                LogCardioView(prefillType: cardioToLog?.cardioType)
+            }
         }
     }
 
@@ -90,11 +107,10 @@ struct HomeView: View {
                     .foregroundStyle(Color.sfAccent)
             }
 
-            if let workout = todaysProgramWorkout {
-                WorkoutCard(workout: workout) {
-                    activeWorkout = workout
-                }
-            } else {
+            let workout = todaysProgramWorkout
+            let cardio = todaysProgramCardio
+
+            if workout == nil && cardio == nil {
                 // Rest day card
                 HStack(spacing: Spacing.sm) {
                     Image(systemName: "moon.fill")
@@ -110,8 +126,44 @@ struct HomeView: View {
                     Spacer()
                 }
                 .cardStyle()
+            } else {
+                if let workout {
+                    WorkoutCard(workout: workout) { activeWorkout = workout }
+                }
+                if let cardio {
+                    cardioTodayCard(cardio)
+                }
             }
         }
+    }
+
+    private func cardioTodayCard(_ template: CardioTemplate) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: template.cardioType.icon)
+                .font(.system(size: 22))
+                .foregroundStyle(Color.sfAccent)
+                .frame(width: 44, height: 44)
+                .background(Color.sfAccent.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(template.name.isEmpty ? template.displayName : template.name)
+                    .font(.sfHeadline)
+                Text(template.displayName)
+                    .font(.sfCaption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if template.isStructured {
+                Button("Start") { cardioToStart = template }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: 90)
+            } else {
+                Button("Log") { cardioToLog = template; showingLogCardio = true }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: 90)
+            }
+        }
+        .cardStyle()
     }
 
     private func quickStartSection(workout: Workout) -> some View {

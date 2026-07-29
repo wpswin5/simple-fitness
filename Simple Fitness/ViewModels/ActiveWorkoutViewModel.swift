@@ -6,6 +6,11 @@ import Observation
 // Manages all in-memory state during a workout session.
 // Uses @Observable (iOS 17+) — no @Published needed, all stored properties are tracked automatically.
 // When the workout is complete, completedSetLogs + startDate are used to persist a WorkoutLog.
+//
+// Navigation model: a workout has ordered sets (blocks); each set has ordered rounds
+// (working sets); each round has one target per exercise slot. We walk round-by-round
+// within a set, then advance to the next set. Supersets step through each exercise slot
+// within the current round before the round is finished.
 
 @MainActor
 @Observable
@@ -18,7 +23,7 @@ final class ActiveWorkoutViewModel {
     // MARK: - Navigation State
 
     private(set) var currentSetIndex: Int = 0
-    private(set) var currentRepetition: Int = 1   // which round (when setRepetitions > 1)
+    private(set) var currentRoundIndex: Int = 0
     private(set) var currentExerciseIndex: Int = 0
 
     // MARK: - Rest Timer State
@@ -32,10 +37,9 @@ final class ActiveWorkoutViewModel {
     private(set) var isWorkoutComplete: Bool = false
 
     // MARK: - Logging Storage
-    // Outer array indexed by absolute set index (repetition * sets + setIndex)
-    // Inner array indexed by exercise-in-set index
+    // pendingLogs[setIndex][roundIndex][exerciseSlotIndex]
 
-    var pendingLogs: [[ExerciseLogEntry]] = []
+    var pendingLogs: [[[ExerciseLogEntry]]] = []
 
     // Holds confirmed set logs until the workout is saved
     private(set) var completedSetLogs: [WorkoutSetLog] = []
@@ -53,12 +57,17 @@ final class ActiveWorkoutViewModel {
 
     init(workout: Workout) {
         self.workout = workout
-        let totalSets = workout.sortedSets.count * workout.setRepetitions
-        self.pendingLogs = (0..<totalSets).map { i in
-            let setIndex = i % workout.sortedSets.count
-            let set = workout.sortedSets[setIndex]
-            return set.exercises.map { ex in
-                ExerciseLogEntry(exerciseName: ex.exerciseName, reps: ex.targetReps)
+        self.pendingLogs = workout.sortedSets.map { set -> [[ExerciseLogEntry]] in
+            let slots = set.sortedExercises
+            return set.sortedRounds.map { round -> [ExerciseLogEntry] in
+                slots.map { slot -> ExerciseLogEntry in
+                    let target = round.target(forSlot: slot.order)
+                    return ExerciseLogEntry(
+                        exerciseName: slot.exerciseName,
+                        reps: target?.targetReps,
+                        weight: target?.targetWeight
+                    )
+                }
             }
         }
     }
@@ -72,32 +81,49 @@ final class ActiveWorkoutViewModel {
         return sortedSets[currentSetIndex]
     }
 
+    /// The exercise slots for the current set, in order.
+    var currentSlots: [ExerciseInSet] { currentSet?.sortedExercises ?? [] }
+
+    var currentRound: SetRound? {
+        guard let set = currentSet else { return nil }
+        let rounds = set.sortedRounds
+        guard currentRoundIndex < rounds.count else { return nil }
+        return rounds[currentRoundIndex]
+    }
+
     var currentExercise: ExerciseInSet? {
-        guard let set = currentSet, currentExerciseIndex < set.exercises.count else { return nil }
-        return set.exercises[currentExerciseIndex]
+        guard currentExerciseIndex < currentSlots.count else { return nil }
+        return currentSlots[currentExerciseIndex]
+    }
+
+    /// Number of rounds in the current set (for "Round r of R" display).
+    var currentSetRoundCount: Int { currentSet?.sortedRounds.count ?? 0 }
+
+    /// The target for a given slot index within the current round.
+    func currentTarget(forExerciseIndex index: Int) -> ExerciseTarget? {
+        guard index < currentSlots.count, let round = currentRound else { return nil }
+        return round.target(forSlot: currentSlots[index].order)
     }
 
     var completedSetsCount: Int { completedSetLogs.count }
 
-    var totalSets: Int { workout.sortedSets.count * workout.setRepetitions }
+    var totalSets: Int { workout.totalSetCount }
 
     var progress: Double {
         guard totalSets > 0 else { return 0 }
         return Double(completedSetsCount) / Double(totalSets)
     }
 
-    var absoluteSetIndex: Int {
-        (currentRepetition - 1) * sortedSets.count + currentSetIndex
-    }
-
     var currentLogs: [ExerciseLogEntry] {
         get {
-            guard absoluteSetIndex < pendingLogs.count else { return [] }
-            return pendingLogs[absoluteSetIndex]
+            guard currentSetIndex < pendingLogs.count,
+                  currentRoundIndex < pendingLogs[currentSetIndex].count else { return [] }
+            return pendingLogs[currentSetIndex][currentRoundIndex]
         }
         set {
-            guard absoluteSetIndex < pendingLogs.count else { return }
-            pendingLogs[absoluteSetIndex] = newValue
+            guard currentSetIndex < pendingLogs.count,
+                  currentRoundIndex < pendingLogs[currentSetIndex].count else { return }
+            pendingLogs[currentSetIndex][currentRoundIndex] = newValue
         }
     }
 
@@ -117,15 +143,17 @@ final class ActiveWorkoutViewModel {
     // MARK: - Log Update
 
     func updateLog(exerciseIndex: Int, reps: Int?, weight: Double?, rpe: Double?) {
-        guard absoluteSetIndex < pendingLogs.count,
-              exerciseIndex < pendingLogs[absoluteSetIndex].count else { return }
-        pendingLogs[absoluteSetIndex][exerciseIndex].reps   = reps
-        pendingLogs[absoluteSetIndex][exerciseIndex].weight = weight
-        pendingLogs[absoluteSetIndex][exerciseIndex].rpe    = rpe
+        guard currentSetIndex < pendingLogs.count,
+              currentRoundIndex < pendingLogs[currentSetIndex].count,
+              exerciseIndex < pendingLogs[currentSetIndex][currentRoundIndex].count else { return }
+        pendingLogs[currentSetIndex][currentRoundIndex][exerciseIndex].reps   = reps
+        pendingLogs[currentSetIndex][currentRoundIndex][exerciseIndex].weight = weight
+        pendingLogs[currentSetIndex][currentRoundIndex][exerciseIndex].rpe    = rpe
     }
 
-    // MARK: - Set Navigation
+    // MARK: - Set / Round Navigation
 
+    /// Finishes the current round: snapshots its logs, then rests (per-round) or advances.
     func finishCurrentSet() {
         let logs = currentLogs.map { entry in
             ExerciseLog(
@@ -139,22 +167,23 @@ final class ActiveWorkoutViewModel {
         completedSetLogs.append(setLog)
         currentExerciseIndex = 0
 
-        if let rest = currentSet?.restSeconds, rest > 0 {
+        if let rest = currentRound?.restSeconds, rest > 0 {
             startRestTimer(seconds: rest)
         } else {
             advanceToNextSet()
         }
     }
 
+    /// Advances to the next round in the set, or the first round of the next set.
     func advanceToNextSet() {
         stopRestTimer()
-        let nextSetIndex = currentSetIndex + 1
+        let roundsInSet = currentSet?.sortedRounds.count ?? 0
 
-        if nextSetIndex < sortedSets.count {
-            currentSetIndex = nextSetIndex
-        } else if currentRepetition < workout.setRepetitions {
-            currentRepetition += 1
-            currentSetIndex = 0
+        if currentRoundIndex + 1 < roundsInSet {
+            currentRoundIndex += 1
+        } else if currentSetIndex + 1 < sortedSets.count {
+            currentSetIndex += 1
+            currentRoundIndex = 0
         } else {
             completeWorkout()
             return
@@ -163,8 +192,7 @@ final class ActiveWorkoutViewModel {
     }
 
     func advanceExerciseInSuperset() {
-        guard let set = currentSet else { return }
-        if currentExerciseIndex < set.exercises.count - 1 {
+        if currentExerciseIndex < currentSlots.count - 1 {
             currentExerciseIndex += 1
         } else {
             finishCurrentSet()

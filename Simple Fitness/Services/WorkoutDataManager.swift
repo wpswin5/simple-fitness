@@ -34,8 +34,8 @@ final class WorkoutDataManager {
 
     // MARK: - Workouts
 
-    func createWorkout(name: String, sets: [WorkoutSet] = [], setRepetitions: Int = 1) -> Workout {
-        let workout = Workout(name: name, sets: sets, setRepetitions: setRepetitions)
+    func createWorkout(name: String, sets: [WorkoutSet] = []) -> Workout {
+        let workout = Workout(name: name, sets: sets)
         context.insert(workout)
         save()
         return workout

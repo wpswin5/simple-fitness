@@ -41,16 +41,9 @@ struct WorkoutCard: View {
             HStack(spacing: Spacing.lg) {
                 statLabel(
                     icon: "list.bullet",
-                    value: "\(workout.sortedSets.count)",
-                    label: workout.sortedSets.count == 1 ? "set" : "sets"
+                    value: "\(workout.totalSetCount)",
+                    label: workout.totalSetCount == 1 ? "set" : "sets"
                 )
-                if workout.setRepetitions > 1 {
-                    statLabel(
-                        icon: "repeat",
-                        value: "×\(workout.setRepetitions)",
-                        label: "rounds"
-                    )
-                }
                 if workout.estimatedDuration > 0 {
                     statLabel(
                         icon: "clock",

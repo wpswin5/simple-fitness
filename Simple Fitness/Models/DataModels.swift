@@ -48,39 +48,109 @@ enum MuscleGroup: String, Codable, CaseIterable {
 
 // MARK: - Workout Structure
 
+/// One exercise "slot" within a set/block. Defines *which* exercise and whether it's
+/// timed vs rep-based; the per-round targets (reps/weight/effort) live on `ExerciseTarget`.
 @Model
 final class ExerciseInSet {
     var id: String = UUID().uuidString
     var exercise: Exercise?
     var exerciseName: String
-    var targetReps: Int?
-    var targetTime: Int?       // seconds, for timed exercises
-    var effortLevel: Double = 0.75   // 0.0–1.0 of estimated 1RM
+    var isTimeBased: Bool = false
+    var order: Int = 0
     var notes: String = ""
 
-    init(exercise: Exercise, targetReps: Int? = nil, targetTime: Int? = nil, effortLevel: Double = 0.75) {
+    init(exercise: Exercise, isTimeBased: Bool = false, order: Int = 0) {
         self.exercise = exercise
         self.exerciseName = exercise.name
-        self.targetReps = targetReps
-        self.targetTime = targetTime
-        self.effortLevel = effortLevel
+        self.isTimeBased = isTimeBased
+        self.order = order
     }
 }
 
+/// The target for a single exercise slot within a single round
+/// (e.g. "8 reps @ 135 lb, 75% effort").
+@Model
+final class ExerciseTarget {
+    var id: String = UUID().uuidString
+    var order: Int = 0                // matches the ExerciseInSet slot's `order`
+    var exerciseName: String = ""
+    var targetReps: Int?
+    var targetTime: Int?             // seconds, for timed exercises
+    var targetWeight: Double?        // lbs; nil = unspecified
+    var effortLevel: Double?         // 0.0–1.0 of estimated 1RM; nil = unspecified
+
+    init(order: Int,
+         exerciseName: String,
+         targetReps: Int? = nil,
+         targetTime: Int? = nil,
+         targetWeight: Double? = nil,
+         effortLevel: Double? = nil) {
+        self.order = order
+        self.exerciseName = exerciseName
+        self.targetReps = targetReps
+        self.targetTime = targetTime
+        self.targetWeight = targetWeight
+        self.effortLevel = effortLevel
+    }
+
+    /// e.g. "8 reps · 135 lb · 75%" or "60s hold"
+    var displaySummary: String {
+        var parts: [String] = []
+        if let t = targetTime {
+            parts.append("\(t)s")
+        } else if let r = targetReps {
+            parts.append("\(r) reps")
+        }
+        if let w = targetWeight, w > 0 {
+            parts.append("\(w.weightFormatted) lb")
+        }
+        if let e = effortLevel, e > 0 {
+            parts.append("\(Int(e * 100))%")
+        }
+        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+    }
+}
+
+/// One round (working set) of a block. Holds a per-exercise target and its own rest.
+@Model
+final class SetRound {
+    var id: String = UUID().uuidString
+    var order: Int = 0
+    var restSeconds: Int = 60
+    @Relationship(deleteRule: .cascade) var targets: [ExerciseTarget] = []
+
+    init(order: Int, restSeconds: Int = 60, targets: [ExerciseTarget] = []) {
+        self.order = order
+        self.restSeconds = restSeconds
+        self.targets = targets
+    }
+
+    var sortedTargets: [ExerciseTarget] { targets.sorted { $0.order < $1.order } }
+
+    /// The target matching a given exercise slot order.
+    func target(forSlot slotOrder: Int) -> ExerciseTarget? {
+        targets.first { $0.order == slotOrder }
+    }
+}
+
+/// A set/block: one exercise (or a superset of several) performed for one or more rounds.
 @Model
 final class WorkoutSet {
     var id: String = UUID().uuidString
     @Relationship(deleteRule: .cascade) var exercises: [ExerciseInSet] = []
-    var restSeconds: Int = 60
+    @Relationship(deleteRule: .cascade) var rounds: [SetRound] = []
     var order: Int = 0
 
-    init(exercises: [ExerciseInSet], restSeconds: Int = 60, order: Int = 0) {
+    init(exercises: [ExerciseInSet], rounds: [SetRound] = [], order: Int = 0) {
         self.exercises = exercises
-        self.restSeconds = restSeconds
+        self.rounds = rounds
         self.order = order
     }
 
     var isSuperset: Bool { exercises.count > 1 }
+    var sortedExercises: [ExerciseInSet] { exercises.sorted { $0.order < $1.order } }
+    var sortedRounds: [SetRound] { rounds.sorted { $0.order < $1.order } }
+    var roundCount: Int { rounds.count }
 }
 
 @Model
@@ -89,20 +159,18 @@ final class Workout {
     var name: String
     var workoutDescription: String = ""
     @Relationship(deleteRule: .cascade) var sets: [WorkoutSet] = []
-    var setRepetitions: Int = 1
     var estimatedDuration: Int = 0  // minutes
     var isCustom: Bool = true
     var createdDate: Date = Date()
     var createdByUser: String?
 
-    init(name: String, sets: [WorkoutSet] = [], setRepetitions: Int = 1) {
+    init(name: String, sets: [WorkoutSet] = []) {
         self.name = name
         self.sets = sets.sorted { $0.order < $1.order }
-        self.setRepetitions = setRepetitions
     }
 
     var sortedSets: [WorkoutSet] { sets.sorted { $0.order < $1.order } }
-    var totalSetCount: Int { sets.count * setRepetitions }
+    var totalSetCount: Int { sets.reduce(0) { $0 + $1.rounds.count } }
     var exerciseCount: Int { sets.reduce(0) { $0 + $1.exercises.count } }
 }
 
@@ -160,7 +228,10 @@ final class CardioTemplateInterval {
     var order: Int = 0
     var label: String = ""              // e.g. "Warmup", "Fast", "Recovery"
     var distanceValue: Double?          // in parent template's distanceUnit
+    var durationSeconds: Int?           // time-based segment; nil = distance/open
     var paceSecondsPerUnit: Int?        // seconds per mile or km; nil = no pace target
+    var intensity: CardioIntensity = CardioIntensity.moderate
+    var inclinePercent: Double?         // for hill work; nil = flat/unspecified
     var isRest: Bool = false
 
     init(order: Int) {
@@ -173,13 +244,21 @@ final class CardioTemplateInterval {
         return String(format: "%d:%02d", p / 60, p % 60)
     }
 
-    /// One-line summary: "1.0 mi @ 6:00" / "Rest" / "Warmup"
+    /// One-line summary: "Fast: 0.50 · 2:00 @ 6:00 · 4% incline" / "Rest · 1:00"
     var displaySummary: String {
-        if isRest { return label.isEmpty ? "Rest" : label }
+        if isRest {
+            let base = label.isEmpty ? "Rest" : label
+            if let dur = durationSeconds, dur > 0 { return "\(base) · \(dur.timerFormatted)" }
+            return base
+        }
         var parts: [String] = []
-        if let d = distanceValue, d > 0 { parts.append(String(format: "%.2f", d)) }
-        if let pace = paceFormatted       { parts.append("@ \(pace)") }
-        let body = parts.joined(separator: " ")
+        if let d = distanceValue, d > 0     { parts.append(String(format: "%.2f", d)) }
+        if let dur = durationSeconds, dur > 0 { parts.append(dur.timerFormatted) }
+        if let pace = paceFormatted          { parts.append("@ \(pace)") }
+        if let incline = inclinePercent, incline > 0 {
+            parts.append(String(format: "%.0f%% incline", incline))
+        }
+        let body = parts.joined(separator: " · ")
         if body.isEmpty { return label.isEmpty ? "Interval" : label }
         return label.isEmpty ? body : "\(label): \(body)"
     }
@@ -192,6 +271,7 @@ final class CardioTemplate {
     var name: String = ""                 // user-facing name for library templates
     var isTemplate: Bool = false          // true = standalone saved template; false = program-day config
     var cardioType: CardioType = CardioType.running
+    var structureType: CardioWorkoutType = CardioWorkoutType.steady
     var targetDurationSeconds: Int = 0    // 0 = unspecified
     var targetDistance: Double?           // nil = unspecified
     var distanceUnit: DistanceUnit = DistanceUnit.miles
@@ -205,12 +285,18 @@ final class CardioTemplate {
         self.isTemplate = isTemplate
     }
 
-    /// Short label for display in day rows, e.g. "Run · 3 intervals" or "Run · 5.0 mi"
+    /// A structured workout has discrete segments to step through (guided-session eligible).
+    var isStructured: Bool {
+        !intervals.isEmpty && (structureType.isSegmented || isIntervalWorkout)
+    }
+
+    /// Short label for day rows, e.g. "Run · Hill Repeats · 4 segments" or "Run · 5.0 mi"
     var displayName: String {
         var parts: [String] = [cardioType.displayName]
-        if isIntervalWorkout && !intervals.isEmpty {
+        if isStructured {
+            parts.append(structureType.isSegmented ? structureType.displayName : "Intervals")
             let count = intervals.filter { !$0.isRest }.count
-            parts.append("\(count) interval\(count == 1 ? "" : "s")")
+            if count > 0 { parts.append("\(count) segment\(count == 1 ? "" : "s")") }
         } else if let dist = targetDistance, dist > 0 {
             parts.append(String(format: "%.1f %@", dist, distanceUnit.abbreviation))
         } else if targetDurationSeconds > 0 {
@@ -458,6 +544,62 @@ enum SwimStroke: String, Codable, CaseIterable {
         case .breaststroke: return "Breaststroke"
         case .butterfly:   return "Butterfly"
         case .im:          return "IM"
+        }
+    }
+}
+
+/// The structure of a cardio workout — drives default segment scaffolding and display.
+enum CardioWorkoutType: String, Codable, CaseIterable {
+    case steady, intervals, fartlek, hills, tempo, progression
+
+    var displayName: String {
+        switch self {
+        case .steady:      return "Steady"
+        case .intervals:   return "Intervals"
+        case .fartlek:     return "Fartlek"
+        case .hills:       return "Hill Repeats"
+        case .tempo:       return "Tempo"
+        case .progression: return "Progression"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .steady:      return "figure.run"
+        case .intervals:   return "bolt.fill"
+        case .fartlek:     return "shuffle"
+        case .hills:       return "mountain.2.fill"
+        case .tempo:       return "gauge.with.dots.needle.67percent"
+        case .progression: return "chart.line.uptrend.xyaxis"
+        }
+    }
+
+    var blurb: String {
+        switch self {
+        case .steady:      return "One continuous effort"
+        case .intervals:   return "Hard efforts with recovery"
+        case .fartlek:     return "Unstructured speed play"
+        case .hills:       return "Uphill repeats with recovery"
+        case .tempo:       return "Sustained comfortably-hard pace"
+        case .progression: return "Gradually increasing effort"
+        }
+    }
+
+    /// Whether this type is built from discrete segments (everything except steady).
+    var isSegmented: Bool { self != .steady }
+}
+
+/// Effort level for a cardio segment.
+enum CardioIntensity: String, Codable, CaseIterable {
+    case easy, moderate, hard, max, rest
+
+    var displayName: String {
+        switch self {
+        case .easy:     return "Easy"
+        case .moderate: return "Moderate"
+        case .hard:     return "Hard"
+        case .max:      return "Max"
+        case .rest:     return "Rest"
         }
     }
 }

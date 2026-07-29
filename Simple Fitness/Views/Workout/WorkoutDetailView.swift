@@ -46,11 +46,8 @@ struct WorkoutDetailView: View {
             HStack(spacing: Spacing.sm) {
                 infoChip(
                     icon: "list.bullet",
-                    label: "\(workout.sortedSets.count) set\(workout.sortedSets.count == 1 ? "" : "s")"
+                    label: "\(workout.totalSetCount) set\(workout.totalSetCount == 1 ? "" : "s")"
                 )
-                if workout.setRepetitions > 1 {
-                    infoChip(icon: "repeat", label: "×\(workout.setRepetitions) rounds")
-                }
                 infoChip(
                     icon: "dumbbell",
                     label: "\(workout.exerciseCount) exercise\(workout.exerciseCount == 1 ? "" : "s")"
@@ -82,9 +79,7 @@ struct WorkoutDetailView: View {
 
     private var setsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            Text(workout.setRepetitions > 1
-                 ? "Sets  ·  \(workout.setRepetitions)× rounds"
-                 : "Sets")
+            Text("Sets")
                 .font(.sfSubhead)
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -129,17 +124,38 @@ struct WorkoutDetailView: View {
                     }
                 }
                 Spacer()
-                Label("\(set.restSeconds)s rest", systemImage: "timer")
+                Text("\(set.roundCount) set\(set.roundCount == 1 ? "" : "s")")
                     .font(.sfCaption)
                     .foregroundStyle(.secondary)
             }
 
+            // Exercise names
+            VStack(spacing: Spacing.xs) {
+                ForEach(set.sortedExercises, id: \.id) { eis in
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: "dumbbell.fill")
+                            .font(.sfCaption2)
+                            .foregroundStyle(Color.sfAccent)
+                            .frame(width: 18)
+                        Text(eis.exerciseName)
+                            .font(.sfCallout)
+                            .foregroundStyle(.primary)
+                        if let muscleGroup = eis.exercise?.muscleGroup {
+                            Text(muscleGroup.displayName)
+                                .font(.sfCaption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+
             Divider()
 
-            // Exercises
+            // Rounds
             VStack(spacing: Spacing.xs) {
-                ForEach(set.exercises, id: \.id) { eis in
-                    exerciseRow(eis: eis)
+                ForEach(Array(set.sortedRounds.enumerated()), id: \.element.id) { rIndex, round in
+                    roundRow(index: rIndex, round: round, set: set)
                 }
             }
         }
@@ -148,37 +164,37 @@ struct WorkoutDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radius.md))
     }
 
-    private func exerciseRow(eis: ExerciseInSet) -> some View {
-        HStack(spacing: Spacing.sm) {
-            Image(systemName: "dumbbell.fill")
+    private func roundRow(index: Int, round: SetRound, set: WorkoutSet) -> some View {
+        HStack(alignment: .top, spacing: Spacing.sm) {
+            Text("\(index + 1)")
                 .font(.sfCaption2)
-                .foregroundStyle(Color.sfAccent)
-                .frame(width: 18)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(Color.sfAccent)
+                .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(eis.exerciseName)
-                    .font(.sfCallout)
-                    .foregroundStyle(.primary)
-                if let muscleGroup = eis.exercise?.muscleGroup {
-                    Text(muscleGroup.displayName)
-                        .font(.sfCaption2)
-                        .foregroundStyle(.secondary)
+                ForEach(set.sortedExercises, id: \.id) { eis in
+                    HStack(spacing: 4) {
+                        if set.isSuperset {
+                            Text(eis.exerciseName + ":")
+                                .font(.sfCaption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(round.target(forSlot: eis.order)?.displaySummary ?? "—")
+                            .font(.sfCaption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
+                    }
                 }
             }
 
             Spacer()
 
-            if let time = eis.targetTime {
-                Text("\(time)s")
-                    .font(.sfCaption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.sfAccent)
-            } else if let reps = eis.targetReps {
-                Text("\(reps) reps")
-                    .font(.sfCaption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.sfAccent)
-            }
+            Label("\(round.restSeconds)s", systemImage: "timer")
+                .font(.sfCaption2)
+                .foregroundStyle(.secondary)
         }
     }
 

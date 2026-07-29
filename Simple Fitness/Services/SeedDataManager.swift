@@ -41,55 +41,60 @@ final class SeedDataManager {
         let lunge       = makeExercise("Walking Lunge",     muscle: .quadriceps, equipment: "Bodyweight")
 
         // MARK: Push Workout
-        let pushWorkout = Workout(name: "Push Day", setRepetitions: 1)
+        let pushWorkout = Workout(name: "Push Day")
         pushWorkout.workoutDescription = "Chest, shoulders, triceps"
         pushWorkout.estimatedDuration = 55
-
-        let set1 = makeSet(exercises: [benchPress],   reps: 8,  effort: 0.75, rest: 120, order: 0)
-        let set2 = makeSet(exercises: [inclineDB],    reps: 10, effort: 0.70, rest: 90,  order: 1)
-        let set3 = makeSet(exercises: [ohPress],      reps: 8,  effort: 0.70, rest: 90,  order: 2)
-        // Superset: lateral raise + tricep dip
-        let set4 = makeSet(exercises: [lateralRaise, tricepDip], reps: 12, effort: 0.60, rest: 60, order: 3)
-
-        pushWorkout.sets = [set1, set2, set3, set4]
+        pushWorkout.sets = [
+            // Showcase: a classic ascending-weight progression on bench.
+            variableSet(benchPress, order: 0, rounds: [
+                (reps: 8, weight: 135, effort: 0.72, rest: 120),
+                (reps: 6, weight: 155, effort: 0.78, rest: 150),
+                (reps: 4, weight: 185, effort: 0.85, rest: 180),
+            ]),
+            uniformSet([inclineDB], reps: 10, weight: 50,  effort: 0.70, rest: 90,  rounds: 3, order: 1),
+            uniformSet([ohPress],   reps: 8,  weight: 95,  effort: 0.70, rest: 90,  rounds: 3, order: 2),
+            // Superset: lateral raise + tricep dip
+            uniformSet([lateralRaise, tricepDip], reps: 12, effort: 0.60, rest: 60, rounds: 3, order: 3),
+        ]
         context.insert(pushWorkout)
 
         // MARK: Pull Workout
-        let pullWorkout = Workout(name: "Pull Day", setRepetitions: 1)
+        let pullWorkout = Workout(name: "Pull Day")
         pullWorkout.workoutDescription = "Back and biceps"
         pullWorkout.estimatedDuration = 50
-
-        let pSet1 = makeSet(exercises: [pullUp],   reps: 8,  effort: 0.80, rest: 120, order: 0)
-        let pSet2 = makeSet(exercises: [bentRow],  reps: 8,  effort: 0.75, rest: 90,  order: 1)
-        let pSet3 = makeSet(exercises: [curlEZ],   reps: 12, effort: 0.65, rest: 60,  order: 2)
-
-        pullWorkout.sets = [pSet1, pSet2, pSet3]
+        pullWorkout.sets = [
+            uniformSet([pullUp],  reps: 8,  effort: 0.80, rest: 120, rounds: 3, order: 0),
+            uniformSet([bentRow], reps: 8,  weight: 135, effort: 0.75, rest: 90,  rounds: 3, order: 1),
+            uniformSet([curlEZ],  reps: 12, weight: 60,  effort: 0.65, rest: 60,  rounds: 3, order: 2),
+        ]
         context.insert(pullWorkout)
 
         // MARK: Legs Workout
-        let legsWorkout = Workout(name: "Leg Day", setRepetitions: 1)
+        let legsWorkout = Workout(name: "Leg Day")
         legsWorkout.workoutDescription = "Lower body strength"
         legsWorkout.estimatedDuration = 60
-
-        let lSet1 = makeSet(exercises: [squat],  reps: 5,  effort: 0.80, rest: 180, order: 0)
-        let lSet2 = makeSet(exercises: [rdl],    reps: 8,  effort: 0.70, rest: 120, order: 1)
-        let lSet3 = makeSet(exercises: [lunge],  reps: 12, effort: 0.60, rest: 60,  order: 2)
-        let lSet4 = makeSet(exercises: [plank],  reps: nil, effort: 0.0, rest: 60,  order: 3, time: 60)
-
-        legsWorkout.sets = [lSet1, lSet2, lSet3, lSet4]
+        legsWorkout.sets = [
+            variableSet(squat, order: 0, rounds: [
+                (reps: 5, weight: 225, effort: 0.80, rest: 180),
+                (reps: 5, weight: 245, effort: 0.83, rest: 180),
+                (reps: 5, weight: 265, effort: 0.86, rest: 180),
+            ]),
+            uniformSet([rdl],   reps: 8,  weight: 185, effort: 0.70, rest: 120, rounds: 3, order: 1),
+            uniformSet([lunge], reps: 12, effort: 0.60, rest: 60,  rounds: 3, order: 2),
+            uniformSet([plank], effort: 0.0, rest: 60, rounds: 3, order: 3, time: 60),
+        ]
         context.insert(legsWorkout)
 
-        // MARK: Full Body (Quick)
-        let fullBody = Workout(name: "Full Body Express", setRepetitions: 3)
+        // MARK: Full Body (Quick) — 3-round circuit
+        let fullBody = Workout(name: "Full Body Express")
         fullBody.workoutDescription = "3-round circuit, 30 min"
         fullBody.estimatedDuration = 30
-
-        let fbSet1 = makeSet(exercises: [squat],     reps: 10, effort: 0.60, rest: 45, order: 0)
-        let fbSet2 = makeSet(exercises: [benchPress], reps: 10, effort: 0.60, rest: 45, order: 1)
-        let fbSet3 = makeSet(exercises: [bentRow],   reps: 10, effort: 0.60, rest: 45, order: 2)
-        let fbSet4 = makeSet(exercises: [plank], reps: nil, effort: 0.0, rest: 60, order: 3, time: 45)
-
-        fullBody.sets = [fbSet1, fbSet2, fbSet3, fbSet4]
+        fullBody.sets = [
+            uniformSet([squat],     reps: 10, weight: 135, effort: 0.60, rest: 45, rounds: 3, order: 0),
+            uniformSet([benchPress], reps: 10, weight: 115, effort: 0.60, rest: 45, rounds: 3, order: 1),
+            uniformSet([bentRow],   reps: 10, weight: 95,  effort: 0.60, rest: 45, rounds: 3, order: 2),
+            uniformSet([plank], effort: 0.0, rest: 60, rounds: 3, order: 3, time: 45),
+        ]
         context.insert(fullBody)
 
         do {
@@ -107,20 +112,67 @@ final class SeedDataManager {
         return e
     }
 
-    private func makeSet(
-        exercises: [Exercise],
-        reps: Int?,
+    /// A block of `rounds` identical rounds over one or more exercises (superset when >1).
+    private func uniformSet(
+        _ exercises: [Exercise],
+        reps: Int? = nil,
+        weight: Double? = nil,
         effort: Double,
         rest: Int,
+        rounds: Int,
         order: Int,
         time: Int? = nil
     ) -> WorkoutSet {
-        let inSets = exercises.map { ex in
-            let eis = ExerciseInSet(exercise: ex, targetReps: reps, targetTime: time, effortLevel: effort)
-            context.insert(eis)
-            return eis
+        let slots: [ExerciseInSet] = exercises.enumerated().map { i, ex in
+            let s = ExerciseInSet(exercise: ex, isTimeBased: time != nil, order: i)
+            context.insert(s)
+            return s
         }
-        let set = WorkoutSet(exercises: inSets, restSeconds: rest, order: order)
+        let setRounds: [SetRound] = (0..<rounds).map { rIndex in
+            let targets: [ExerciseTarget] = slots.map { slot in
+                let t = ExerciseTarget(
+                    order: slot.order,
+                    exerciseName: slot.exerciseName,
+                    targetReps: time != nil ? nil : reps,
+                    targetTime: time,
+                    targetWeight: weight,
+                    effortLevel: effort
+                )
+                context.insert(t)
+                return t
+            }
+            let round = SetRound(order: rIndex, restSeconds: rest, targets: targets)
+            context.insert(round)
+            return round
+        }
+        let set = WorkoutSet(exercises: slots, rounds: setRounds, order: order)
+        context.insert(set)
+        return set
+    }
+
+    /// A single-exercise block whose rounds vary in reps/weight/effort/rest.
+    private func variableSet(
+        _ exercise: Exercise,
+        order: Int,
+        rounds specs: [(reps: Int, weight: Double, effort: Double, rest: Int)]
+    ) -> WorkoutSet {
+        let slot = ExerciseInSet(exercise: exercise, isTimeBased: false, order: 0)
+        context.insert(slot)
+        let setRounds: [SetRound] = specs.enumerated().map { rIndex, spec in
+            let t = ExerciseTarget(
+                order: 0,
+                exerciseName: exercise.name,
+                targetReps: spec.reps,
+                targetTime: nil,
+                targetWeight: spec.weight,
+                effortLevel: spec.effort
+            )
+            context.insert(t)
+            let round = SetRound(order: rIndex, restSeconds: spec.rest, targets: [t])
+            context.insert(round)
+            return round
+        }
+        let set = WorkoutSet(exercises: [slot], rounds: setRounds, order: order)
         context.insert(set)
         return set
     }

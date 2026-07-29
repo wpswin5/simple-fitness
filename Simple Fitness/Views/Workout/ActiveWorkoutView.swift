@@ -21,7 +21,7 @@ struct ActiveWorkoutView: View {
             if vm.isResting {
                 RestTimerView(
                     secondsRemaining: vm.restTimeRemaining,
-                    totalSeconds: vm.currentSet?.restSeconds ?? 60,
+                    totalSeconds: vm.currentRound?.restSeconds ?? 60,
                     onSkip: { vm.skipRest() }
                 )
                 .transition(.opacity)
@@ -72,11 +72,12 @@ struct ActiveWorkoutView: View {
                     // Set header
                     setHeader
 
-                    // Exercise cards (one per exercise in set)
+                    // Exercise cards (one per exercise slot in the current round)
                     if let set = vm.currentSet {
-                        ForEach(Array(set.exercises.enumerated()), id: \.offset) { index, exercise in
+                        ForEach(Array(vm.currentSlots.enumerated()), id: \.offset) { index, slot in
                             ExerciseLogCard(
-                                exercise: exercise,
+                                exercise: slot,
+                                target: vm.currentTarget(forExerciseIndex: index),
                                 logEntry: binding(for: index),
                                 isCurrent: index == vm.currentExerciseIndex,
                                 isSuperset: set.isSuperset
@@ -161,8 +162,8 @@ struct ActiveWorkoutView: View {
                         .fontWeight(.semibold)
                 }
 
-                if vm.workout.setRepetitions > 1 {
-                    Text("Round \(vm.currentRepetition) of \(vm.workout.setRepetitions)")
+                if vm.currentSetRoundCount > 1 {
+                    Text("Round \(vm.currentRoundIndex + 1) of \(vm.currentSetRoundCount)")
                         .font(.sfCaption)
                         .foregroundStyle(.secondary)
                 }
@@ -176,7 +177,7 @@ struct ActiveWorkoutView: View {
     private var actionButton: some View {
         Group {
             if let set = vm.currentSet, set.isSuperset,
-               vm.currentExerciseIndex < set.exercises.count - 1 {
+               vm.currentExerciseIndex < vm.currentSlots.count - 1 {
                 Button("Next Exercise →") {
                     vm.advanceExerciseInSuperset()
                 }
@@ -238,6 +239,7 @@ struct ActiveWorkoutView: View {
 
 struct ExerciseLogCard: View {
     let exercise: ExerciseInSet
+    let target: ExerciseTarget?
     @Binding var logEntry: ExerciseLogEntry
     let isCurrent: Bool
     let isSuperset: Bool
@@ -254,12 +256,8 @@ struct ExerciseLogCard: View {
                         .font(.sfHeadline)
                         .foregroundStyle(isCurrent ? Color.sfAccent : .primary)
 
-                    if let reps = exercise.targetReps {
-                        Text("Target: \(reps) reps @ \(Int(exercise.effortLevel * 100))%")
-                            .font(.sfCaption)
-                            .foregroundStyle(.secondary)
-                    } else if let time = exercise.targetTime {
-                        Text("Target: \(time)s hold")
+                    if let target {
+                        Text("Target: \(target.displaySummary)")
                             .font(.sfCaption)
                             .foregroundStyle(.secondary)
                     }

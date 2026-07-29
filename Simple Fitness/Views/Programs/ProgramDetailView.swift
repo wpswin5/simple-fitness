@@ -10,6 +10,7 @@ struct ProgramDetailView: View {
     @State private var activeWorkout: Workout? = nil
     @State private var showingLogCardio = false
     @State private var cardioToLog: CardioTemplate? = nil
+    @State private var cardioToStart: CardioTemplate? = nil
     @State private var showingUnregisterConfirm = false
     @State private var showingEdit = false
 
@@ -37,6 +38,9 @@ struct ProgramDetailView: View {
         }
         .sheet(isPresented: $showingLogCardio) {
             LogCardioView(prefillType: cardioToLog?.cardioType)
+        }
+        .fullScreenCover(item: $cardioToStart) { template in
+            ActiveCardioView(template: template)
         }
         .sheet(isPresented: $showingEdit) {
             CreateProgramView(editing: program)
@@ -135,12 +139,18 @@ struct ProgramDetailView: View {
                                             Text(template.displayName).font(.sfSubhead)
                                         }
                                         Spacer()
-                                        Button("Log") {
-                                            cardioToLog = template
-                                            showingLogCardio = true
+                                        if template.isStructured {
+                                            Button("Start") { cardioToStart = template }
+                                                .buttonStyle(PrimaryButtonStyle())
+                                                .frame(maxWidth: 100)
+                                        } else {
+                                            Button("Log") {
+                                                cardioToLog = template
+                                                showingLogCardio = true
+                                            }
+                                            .buttonStyle(PrimaryButtonStyle())
+                                            .frame(maxWidth: 100)
                                         }
-                                        .buttonStyle(PrimaryButtonStyle())
-                                        .frame(maxWidth: 100)
                                     case .rest:
                                         EmptyView()
                                     }
@@ -294,10 +304,10 @@ struct ProgramDetailView: View {
                                 .buttonStyle(.plain)
                             } else if let cardio = activity.cardioTemplate {
                                 Button {
-                                    cardioToLog = cardio
-                                    showingLogCardio = true
+                                    if cardio.isStructured { cardioToStart = cardio }
+                                    else { cardioToLog = cardio; showingLogCardio = true }
                                 } label: {
-                                    Image(systemName: "plus.circle")
+                                    Image(systemName: cardio.isStructured ? "play.circle" : "plus.circle")
                                         .foregroundStyle(Color.sfAccent).font(.system(size: 20))
                                 }
                                 .buttonStyle(.plain)
