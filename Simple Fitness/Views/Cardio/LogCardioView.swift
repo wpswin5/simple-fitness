@@ -300,12 +300,15 @@ struct LogCardioView: View {
                 entry.isRest  = iv.isRest
                 if let d = iv.distanceValue, d > 0 {
                     entry.distanceText = String(format: "%.2f", d)
-                    // Pre-fill expected duration if pace is known
-                    if let pace = iv.paceSecondsPerUnit, pace > 0 {
-                        let expectedSec = Int(d * Double(pace))
-                        entry.minutes = "\(expectedSec / 60)"
-                        entry.seconds = expectedSec % 60 > 0 ? "\(expectedSec % 60)" : ""
-                    }
+                }
+                // Prefer an explicit segment duration; otherwise derive from pace × distance.
+                if let dur = iv.durationSeconds, dur > 0 {
+                    entry.minutes = "\(dur / 60)"
+                    entry.seconds = dur % 60 > 0 ? "\(dur % 60)" : ""
+                } else if let d = iv.distanceValue, d > 0, let pace = iv.paceSecondsPerUnit, pace > 0 {
+                    let expectedSec = Int(d * Double(pace))
+                    entry.minutes = "\(expectedSec / 60)"
+                    entry.seconds = expectedSec % 60 > 0 ? "\(expectedSec % 60)" : ""
                 }
                 return entry
             }

@@ -12,6 +12,10 @@ struct DraftInterval: Identifiable {
     var distanceText: String = ""
     var paceMinutes: String = ""
     var paceSeconds: String = ""
+    var durationMinutes: String = ""
+    var durationSecondsText: String = ""
+    var intensity: CardioIntensity = .moderate
+    var inclineText: String = ""
     var isRest: Bool = false
 
     var paceSecondsPerUnit: Int? {
@@ -19,6 +23,18 @@ struct DraftInterval: Identifiable {
         let s = Int(paceSeconds) ?? 0
         let total = m * 60 + s
         return total > 0 ? total : nil
+    }
+
+    var durationTotalSeconds: Int? {
+        let m = Int(durationMinutes) ?? 0
+        let s = Int(durationSecondsText) ?? 0
+        let total = m * 60 + s
+        return total > 0 ? total : nil
+    }
+
+    var inclineValue: Double? {
+        guard let v = Double(inclineText), v > 0 else { return nil }
+        return v
     }
 
     var displaySummary: String {
@@ -37,6 +53,7 @@ struct DraftInterval: Identifiable {
 /// Lightweight cardio target used while building a program day (not persisted until save)
 struct DraftCardioTemplate {
     var type: CardioType = .running
+    var structureType: CardioWorkoutType = .steady
     var targetHours: String = ""
     var targetMinutes: String = ""
     var targetSeconds: String = ""
@@ -131,6 +148,7 @@ struct DraftProgramWeek: Identifiable {
                         var dc = DraftCardioTemplate(type: template.cardioType)
                         dc.distanceUnit = template.distanceUnit
                         dc.isIntervalWorkout = template.isIntervalWorkout
+                        dc.structureType = template.structureType
                         dc.notes = template.notes
                         if template.targetDurationSeconds > 0 {
                             let total = template.targetDurationSeconds
@@ -143,12 +161,20 @@ struct DraftProgramWeek: Identifiable {
                         }
                         dc.intervals = template.sortedIntervals.map { iv in
                             var di = DraftInterval()
-                            di.label  = iv.label
-                            di.isRest = iv.isRest
+                            di.label     = iv.label
+                            di.isRest    = iv.isRest
+                            di.intensity = iv.intensity
                             if let d = iv.distanceValue, d > 0 { di.distanceText = String(format: "%.1f", d) }
                             if let p = iv.paceSecondsPerUnit, p > 0 {
                                 di.paceMinutes = "\(p / 60)"
                                 di.paceSeconds = p % 60 > 0 ? "\(p % 60)" : ""
+                            }
+                            if let dur = iv.durationSeconds, dur > 0 {
+                                di.durationMinutes = "\(dur / 60)"
+                                di.durationSecondsText = dur % 60 > 0 ? "\(dur % 60)" : ""
+                            }
+                            if let incline = iv.inclinePercent, incline > 0 {
+                                di.inclineText = incline.weightFormatted
                             }
                             return di
                         }
@@ -203,6 +229,20 @@ final class CreateProgramViewModel {
         if self.weeks.isEmpty {
             self.weeks = [DraftProgramWeek(weekNumber: 1)]
         }
+    }
+
+    /// Seeds a new (create-mode) program from pre-built drafts — used by CSV import.
+    /// Calling `save(context:)` afterward persists it via the same `buildWeeks` path.
+    init(prefilled name: String,
+         description: String,
+         goal: TrainingGoal,
+         difficulty: DifficultyLevel,
+         weeks: [DraftProgramWeek]) {
+        self.programName = name
+        self.programDescription = description
+        self.targetGoal = goal
+        self.difficultyLevel = difficulty
+        self.weeks = weeks.isEmpty ? [DraftProgramWeek(weekNumber: 1)] : weeks
     }
 
     // MARK: - Computed
@@ -300,6 +340,7 @@ final class CreateProgramViewModel {
                         var cardioTemplate: CardioTemplate? = nil
                         if let draft = draftActivity.cardioTemplate {
                             let t = CardioTemplate(cardioType: draft.type)
+                            t.structureType = draft.structureType
                             t.targetDurationSeconds = draft.targetDurationSeconds
                             t.targetDistance = Double(draft.targetDistance)
                             t.distanceUnit = draft.distanceUnit
@@ -310,8 +351,11 @@ final class CreateProgramViewModel {
                                     let iv = CardioTemplateInterval(order: ivIdx)
                                     iv.label              = di.label
                                     iv.isRest             = di.isRest
+                                    iv.intensity          = di.intensity
                                     iv.distanceValue      = Double(di.distanceText)
+                                    iv.durationSeconds    = di.durationTotalSeconds
                                     iv.paceSecondsPerUnit = di.paceSecondsPerUnit
+                                    iv.inclinePercent     = di.inclineValue
                                     context.insert(iv)
                                     return iv
                                 }

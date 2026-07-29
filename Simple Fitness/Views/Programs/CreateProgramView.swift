@@ -426,6 +426,7 @@ struct ActivityPickerSheet: View {
         var draft = DraftCardioTemplate(type: template.cardioType)
         draft.distanceUnit      = template.distanceUnit
         draft.isIntervalWorkout = template.isIntervalWorkout
+        draft.structureType     = template.structureType
         draft.notes             = template.notes
         if template.targetDurationSeconds > 0 {
             let total = template.targetDurationSeconds
@@ -439,11 +440,15 @@ struct ActivityPickerSheet: View {
         }
         draft.intervals = template.sortedIntervals.map { iv in
             var di = DraftInterval()
-            di.label  = iv.label; di.isRest = iv.isRest
+            di.label = iv.label; di.isRest = iv.isRest; di.intensity = iv.intensity
             if let d = iv.distanceValue, d > 0 { di.distanceText = String(format: "%.2f", d) }
             if let p = iv.paceSecondsPerUnit, p > 0 {
                 di.paceMinutes = "\(p / 60)"; di.paceSeconds = p % 60 > 0 ? "\(p % 60)" : ""
             }
+            if let dur = iv.durationSeconds, dur > 0 {
+                di.durationMinutes = "\(dur / 60)"; di.durationSecondsText = dur % 60 > 0 ? "\(dur % 60)" : ""
+            }
+            if let incline = iv.inclinePercent, incline > 0 { di.inclineText = incline.weightFormatted }
             return di
         }
         return draft
