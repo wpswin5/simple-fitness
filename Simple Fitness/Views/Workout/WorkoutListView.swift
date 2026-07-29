@@ -20,9 +20,11 @@ struct WorkoutListView: View {
     enum Segment { case strength, cardio }
     @State private var segment: Segment = .strength
     @State private var showingCreateWorkout = false
+    @State private var showingGenerateWorkout = false
     @State private var showingLogCardio = false
     @State private var showingCreateTemplate = false
     @State private var editingTemplate: CardioTemplate? = nil
+    @State private var startingTemplate: CardioTemplate? = nil
     @State private var workoutToDelete: Workout?
     @State private var cardioLogToDelete: CardioLog?
     @State private var templateToDelete: CardioTemplate?
@@ -49,6 +51,9 @@ struct WorkoutListView: View {
             .sheet(isPresented: $showingCreateWorkout) {
                 CreateWorkoutView()
             }
+            .sheet(isPresented: $showingGenerateWorkout) {
+                GenerateWorkoutView()
+            }
             .sheet(isPresented: $showingLogCardio) {
                 LogCardioView()
             }
@@ -57,6 +62,9 @@ struct WorkoutListView: View {
             }
             .sheet(item: $editingTemplate) { template in
                 CreateCardioTemplateView(editing: template)
+            }
+            .fullScreenCover(item: $startingTemplate) { template in
+                ActiveCardioView(template: template)
             }
         }
     }
@@ -72,13 +80,44 @@ struct WorkoutListView: View {
         .frame(width: 180)
     }
 
+    /// Whether AI generation entry points should be shown at all.
+    /// Gated behind the feature flag while generation is being revisited; then
+    /// hidden on ineligible hardware in release builds, and always shown in
+    /// DEBUG so the mock generator stays reachable.
+    private var canShowGenerate: Bool {
+        guard FeatureFlags.aiWorkoutGeneration else { return false }
+        #if DEBUG
+        return true
+        #else
+        return GenerationAvailability.current != .deviceNotEligible
+        #endif
+    }
+
     private var addButton: some View {
         Group {
             if segment == .strength {
-                Button {
-                    showingCreateWorkout = true
-                } label: {
-                    Image(systemName: "plus").fontWeight(.semibold)
+                if canShowGenerate {
+                    Menu {
+                        Button {
+                            showingCreateWorkout = true
+                        } label: {
+                            Label("New Workout", systemImage: "square.and.pencil")
+                        }
+                        Button {
+                            showingGenerateWorkout = true
+                        } label: {
+                            Label("Generate with AI", systemImage: "wand.and.stars")
+                        }
+                    } label: {
+                        Image(systemName: "plus").fontWeight(.semibold)
+                    }
+                } else {
+                    // No AI entry point — the + opens New Workout directly.
+                    Button {
+                        showingCreateWorkout = true
+                    } label: {
+                        Image(systemName: "plus").fontWeight(.semibold)
+                    }
                 }
             } else {
                 Menu {
@@ -218,7 +257,10 @@ struct WorkoutListView: View {
                     ForEach(savedTemplates) { template in
                         CardioTemplateRow(template: template)
                             .background(Color.sfSurface)
-                            .onTapGesture { editingTemplate = template }
+                            .onTapGesture {
+                                if template.isStructured { startingTemplate = template }
+                                else { editingTemplate = template }
+                            }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     templateToDelete = template
@@ -233,6 +275,11 @@ struct WorkoutListView: View {
                                 .tint(Color.sfAccent)
                             }
                             .contextMenu {
+                                if template.isStructured {
+                                    Button { startingTemplate = template } label: {
+                                        Label("Start Guided Session", systemImage: "play.fill")
+                                    }
+                                }
                                 Button { editingTemplate = template } label: {
                                     Label("Edit Template", systemImage: "pencil")
                                 }
@@ -292,9 +339,19 @@ struct WorkoutListView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            Button("Create Workout") { showingCreateWorkout = true }
-                .buttonStyle(PrimaryButtonStyle())
-                .frame(maxWidth: 220)
+            VStack(spacing: Spacing.sm) {
+                Button("Create Workout") { showingCreateWorkout = true }
+                    .buttonStyle(PrimaryButtonStyle())
+                if canShowGenerate {
+                    Button {
+                        showingGenerateWorkout = true
+                    } label: {
+                        Label("Generate with AI", systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+            }
+            .frame(maxWidth: 220)
         }
         .padding(Spacing.xl)
     }
@@ -348,9 +405,9 @@ private struct CardioTemplateRow: View {
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.sfCaption2)
-                .foregroundStyle(.secondary)
+            Image(systemName: template.isStructured ? "play.circle.fill" : "chevron.right")
+                .font(template.isStructured ? .system(size: 22) : .sfCaption2)
+                .foregroundStyle(template.isStructured ? Color.sfAccent : .secondary)
         }
         .padding(.horizontal, Spacing.md)
         .padding(.vertical, 12)
