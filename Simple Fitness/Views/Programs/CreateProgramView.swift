@@ -629,8 +629,10 @@ struct CardioTargetFormView: View {
 
                 if draft.isIntervalWorkout {
                     Section {
-                        ForEach($draft.intervals) { $interval in
-                            IntervalRowView(interval: $interval, distanceUnit: distanceUnit)
+                        ForEach(draft.intervals) { interval in
+                            if let i = draft.intervals.firstIndex(where: { $0.id == interval.id }) {
+                                IntervalRowView(interval: $draft.intervals[i], distanceUnit: distanceUnit)
+                            }
                         }
                         .onDelete { draft.intervals.remove(atOffsets: $0) }
 

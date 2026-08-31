@@ -122,12 +122,14 @@ struct CreateCardioTemplateView: View {
                 // Structured segments
                 if isSegmented {
                     Section {
-                        ForEach($segments) { $segment in
-                            SegmentRowView(
-                                segment: $segment,
-                                distanceUnit: distanceUnit,
-                                showIncline: structureType == .hills
-                            )
+                        ForEach(segments) { segment in
+                            if let i = segments.firstIndex(where: { $0.id == segment.id }) {
+                                SegmentRowView(
+                                    segment: $segments[i],
+                                    distanceUnit: distanceUnit,
+                                    showIncline: structureType == .hills
+                                )
+                            }
                         }
                         .onDelete { segments.remove(atOffsets: $0) }
                         .onMove { segments.move(fromOffsets: $0, toOffset: $1) }

@@ -153,25 +153,23 @@ struct SettingsView: View {
     }
 
     private func resetAllData() {
-        deleteAll(ExerciseLog.self)
-        deleteAll(WorkoutSetLog.self)
+        // Delete aggregate ROOTS only — SwiftData cascade removes their children
+        // (sets/rounds/targets, weeks/days/activities, set-logs, splits, intervals).
+        // Deleting children explicitly too would make cascade double-delete already
+        // invalidated objects, which crashes before the save (leaving data intact).
         deleteAll(WorkoutLog.self)
-        deleteAll(ExerciseInSet.self)
-        deleteAll(WorkoutSet.self)
-        deleteAll(Workout.self)
-        deleteAll(ProgramDayActivity.self)
-        deleteAll(ProgramDay.self)
-        deleteAll(ProgramWeek.self)
-        deleteAll(Program.self)
-        deleteAll(ProgramRegistration.self)
-        deleteAll(UserProfile.self)
-        deleteAll(Exercise.self)
-        deleteAll(CardioSplit.self)
-        deleteAll(SwimSet.self)
         deleteAll(CardioLog.self)
-        deleteAll(CardioTemplateInterval.self)
+        deleteAll(ProgramRegistration.self)
+        deleteAll(Program.self)
+        deleteAll(Workout.self)
         deleteAll(CardioTemplate.self)
-        try? modelContext.save()
+        deleteAll(Exercise.self)
+        deleteAll(UserProfile.self)
+        do {
+            try modelContext.save()
+        } catch {
+            // Non-fatal: nothing else to do here beyond leaving the store as-is.
+        }
     }
 
     private func deleteAll<T: PersistentModel>(_ type: T.Type) {
