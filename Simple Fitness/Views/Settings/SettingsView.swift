@@ -153,28 +153,29 @@ struct SettingsView: View {
     }
 
     private func resetAllData() {
-        // Delete aggregate ROOTS only — SwiftData cascade removes their children
-        // (sets/rounds/targets, weeks/days/activities, set-logs, splits, intervals).
-        // Deleting children explicitly too would make cascade double-delete already
-        // invalidated objects, which crashes before the save (leaving data intact).
-        deleteAll(WorkoutLog.self)
-        deleteAll(CardioLog.self)
-        deleteAll(ProgramRegistration.self)
-        deleteAll(Program.self)
-        deleteAll(Workout.self)
-        deleteAll(CardioTemplate.self)
-        deleteAll(Exercise.self)
-        deleteAll(UserProfile.self)
-        do {
-            try modelContext.save()
-        } catch {
-            // Non-fatal: nothing else to do here beyond leaving the store as-is.
+        // Delete on a throwaway CHILD context, then save. This sends clean deletion
+        // notifications to the main context's @Query views, instead of leaving
+        // just-deleted objects that a still-alive view (e.g. the Cardio tab) would
+        // render and fault on — which crashes on enum attributes like
+        // CardioTemplate.structureType.
+        //
+        // Aggregate ROOTS only; SwiftData cascade removes their children. (Deleting
+        // children explicitly too would double-delete via cascade.)
+        let ctx = ModelContext(modelContext.container)
+        func wipe<T: PersistentModel>(_ type: T.Type) {
+            if let items = try? ctx.fetch(FetchDescriptor<T>()) {
+                items.forEach { ctx.delete($0) }
+            }
         }
-    }
-
-    private func deleteAll<T: PersistentModel>(_ type: T.Type) {
-        guard let items = try? modelContext.fetch(FetchDescriptor<T>()) else { return }
-        items.forEach { modelContext.delete($0) }
+        wipe(WorkoutLog.self)
+        wipe(CardioLog.self)
+        wipe(ProgramRegistration.self)
+        wipe(Program.self)
+        wipe(Workout.self)
+        wipe(CardioTemplate.self)
+        wipe(Exercise.self)
+        wipe(UserProfile.self)
+        try? ctx.save()
     }
 
     // MARK: - Import
