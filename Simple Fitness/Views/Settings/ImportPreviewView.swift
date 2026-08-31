@@ -66,6 +66,15 @@ struct ImportPreviewView: View {
                 }
             }
 
+            if !staged.cardioTemplates.isEmpty {
+                Section("Cardio Templates (\(staged.cardioTemplates.count))") {
+                    ForEach(staged.cardioTemplates, id: \.self) { name in
+                        Label(name, systemImage: "figure.run")
+                            .foregroundStyle(Color.sfAccent)
+                    }
+                }
+            }
+
             if !staged.programs.isEmpty {
                 Section("Programs (\(staged.programs.count))") {
                     ForEach(staged.programs) { program in
