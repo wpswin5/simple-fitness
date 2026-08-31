@@ -12,6 +12,14 @@ import Observation
 // within a set, then advance to the next set. Supersets step through each exercise slot
 // within the current round before the round is finished.
 
+/// Snapshot of the next set to be worked, shown on the rest screen.
+struct NextUpInfo: Equatable {
+    var label: String
+    var title: String
+    var detail: String
+    var isSuperset: Bool
+}
+
 @MainActor
 @Observable
 final class ActiveWorkoutViewModel {
@@ -46,8 +54,10 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Timers (nonisolated(unsafe) so deinit can invalidate them safely)
 
-    nonisolated(unsafe) private var restTimer: Timer?
-    nonisolated(unsafe) private var workoutTimer: Timer?
+    // Single 0.5s UI ticker; actual time comes from the wall clock so backgrounding
+    // or locking the phone never freezes the elapsed/rest counters.
+    nonisolated(unsafe) private var ticker: Timer?
+    private var restEndDate: Date?
 
     // MARK: - Start Date
 
@@ -105,6 +115,46 @@ final class ActiveWorkoutViewModel {
         return round.target(forSlot: currentSlots[index].order)
     }
 
+    /// Global 0-based index of a (set, round) across the whole workout — used to
+    /// mark rounds as completed/current/upcoming in the overview.
+    func globalRoundIndex(setIndex: Int, roundIndex: Int) -> Int {
+        var idx = 0
+        for i in 0..<setIndex where i < sortedSets.count {
+            idx += sortedSets[i].sortedRounds.count
+        }
+        return idx + roundIndex
+    }
+
+    /// The set/round that will be worked next (used on the rest screen).
+    /// nil when the current round is the last in the workout.
+    var nextUp: NextUpInfo? {
+        let roundsInSet = currentSet?.sortedRounds.count ?? 0
+        var setIdx = currentSetIndex
+        var roundIdx = currentRoundIndex
+        if roundIdx + 1 < roundsInSet {
+            roundIdx += 1
+        } else if setIdx + 1 < sortedSets.count {
+            setIdx += 1
+            roundIdx = 0
+        } else {
+            return nil
+        }
+        guard setIdx < sortedSets.count else { return nil }
+        let set = sortedSets[setIdx]
+        let slots = set.sortedExercises
+        guard roundIdx < set.sortedRounds.count else { return nil }
+        let round = set.sortedRounds[roundIdx]
+        let title = slots.map { $0.exerciseName }.joined(separator: " + ")
+        let detail = slots.first.flatMap { round.target(forSlot: $0.order)?.displaySummary } ?? ""
+        // completedSetsCount was already incremented when the current round finished.
+        return NextUpInfo(
+            label: "Set \(completedSetsCount + 1) of \(totalSets)",
+            title: title,
+            detail: detail,
+            isSuperset: set.isSuperset
+        )
+    }
+
     var completedSetsCount: Int { completedSetLogs.count }
 
     var totalSets: Int { workout.totalSetCount }
@@ -131,13 +181,32 @@ final class ActiveWorkoutViewModel {
 
     func startWorkout() {
         startDate = Date()
-        startWorkoutTimer()
+        elapsedSeconds = 0
+        RestNotifier.requestAuthorizationIfNeeded()
+        startTicker()
     }
 
     func completeWorkout() {
-        stopRestTimer()
-        stopWorkoutTimer()
+        RestNotifier.cancel()
+        stopTicker()
+        isResting = false
+        restEndDate = nil
         isWorkoutComplete = true
+    }
+
+    /// Recompute elapsed + rest from the wall clock. Called every tick and when the
+    /// app returns to the foreground, so backgrounding/locking never loses time.
+    func refresh() {
+        guard !isWorkoutComplete else { return }
+        elapsedSeconds = max(0, Int(Date().timeIntervalSince(startDate)))
+        if isResting, let end = restEndDate {
+            let remaining = end.timeIntervalSinceNow
+            if remaining <= 0 {
+                finishResting()
+            } else {
+                restTimeRemaining = Int(remaining.rounded(.up))
+            }
+        }
     }
 
     // MARK: - Log Update
@@ -176,7 +245,6 @@ final class ActiveWorkoutViewModel {
 
     /// Advances to the next round in the set, or the first round of the next set.
     func advanceToNextSet() {
-        stopRestTimer()
         let roundsInSet = currentSet?.sortedRounds.count ?? 0
 
         if currentRoundIndex + 1 < roundsInSet {
@@ -199,56 +267,46 @@ final class ActiveWorkoutViewModel {
         }
     }
 
-    // MARK: - Rest Timer
+    // MARK: - Rest (wall-clock)
 
     func startRestTimer(seconds: Int) {
+        let end = Date().addingTimeInterval(TimeInterval(seconds))
+        restEndDate = end
         restTimeRemaining = seconds
         isResting = true
-        restTimer?.invalidate()
-        restTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if self.restTimeRemaining > 1 {
-                    self.restTimeRemaining -= 1
-                } else {
-                    self.stopRestTimer()
-                    self.advanceToNextSet()
-                }
-            }
-        }
+        RestNotifier.scheduleRestOver(at: end)
     }
 
     func skipRest() {
-        stopRestTimer()
+        RestNotifier.cancel()
+        finishResting()
+    }
+
+    /// Ends rest and advances. Called on skip and when the rest interval elapses.
+    private func finishResting() {
+        RestNotifier.cancel()
+        restEndDate = nil
+        isResting = false
+        restTimeRemaining = 0
         advanceToNextSet()
     }
 
-    private func stopRestTimer() {
-        restTimer?.invalidate()
-        restTimer = nil
-        isResting = false
-        restTimeRemaining = 0
-    }
+    // MARK: - Ticker
 
-    // MARK: - Workout Timer
-
-    private func startWorkoutTimer() {
-        elapsedSeconds = 0
-        workoutTimer?.invalidate()
-        workoutTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.elapsedSeconds += 1
-            }
+    private func startTicker() {
+        ticker?.invalidate()
+        ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 
-    private func stopWorkoutTimer() {
-        workoutTimer?.invalidate()
-        workoutTimer = nil
+    private func stopTicker() {
+        ticker?.invalidate()
+        ticker = nil
     }
 
     deinit {
-        restTimer?.invalidate()
-        workoutTimer?.invalidate()
+        ticker?.invalidate()
+        RestNotifier.cancel()
     }
 }

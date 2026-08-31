@@ -3,6 +3,7 @@ import SwiftUI
 struct RestTimerView: View {
     let secondsRemaining: Int
     let totalSeconds: Int
+    let nextUp: NextUpInfo?
     let onSkip: () -> Void
 
     private var progress: Double {
@@ -62,10 +63,30 @@ struct RestTimerView: View {
             Spacer()
 
             // Upcoming set preview
-            Text("Next set coming up…")
-                .font(.sfCaption)
-                .foregroundStyle(.secondary)
+            if let next = nextUp {
+                VStack(spacing: 4) {
+                    Text("Up Next · \(next.label)")
+                        .font(.sfCaption2)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .kerning(0.5)
+                    Text(next.title)
+                        .font(.sfHeadline)
+                        .multilineTextAlignment(.center)
+                    if !next.detail.isEmpty {
+                        Text(next.isSuperset ? "Superset · \(next.detail)" : next.detail)
+                            .font(.sfCaption)
+                            .foregroundStyle(Color.sfAccent)
+                    }
+                }
+                .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, Spacing.xl)
+            } else {
+                Text("Last set — finish strong!")
+                    .font(.sfCaption)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, Spacing.xl)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
@@ -73,5 +94,10 @@ struct RestTimerView: View {
 }
 
 #Preview {
-    RestTimerView(secondsRemaining: 45, totalSeconds: 90, onSkip: {})
+    RestTimerView(
+        secondsRemaining: 45,
+        totalSeconds: 90,
+        nextUp: NextUpInfo(label: "Set 3 of 12", title: "Overhead Press", detail: "8 reps · 95 lb · 70%", isSuperset: false),
+        onSkip: {}
+    )
 }

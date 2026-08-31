@@ -4,11 +4,14 @@ import SwiftData
 struct ActiveWorkoutView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var vm: ActiveWorkoutViewModel
 
     @State private var showingQuitConfirm = false
     @State private var showingSaveError = false
+    @State private var showingOverview = false
+    @FocusState private var fieldFocused: Bool
 
     init(workout: Workout) {
         _vm = State(wrappedValue: ActiveWorkoutViewModel(workout: workout))
@@ -22,6 +25,7 @@ struct ActiveWorkoutView: View {
                 RestTimerView(
                     secondsRemaining: vm.restTimeRemaining,
                     totalSeconds: vm.currentRound?.restSeconds ?? 60,
+                    nextUp: vm.nextUp,
                     onSkip: { vm.skipRest() }
                 )
                 .transition(.opacity)
@@ -42,8 +46,14 @@ struct ActiveWorkoutView: View {
         .animation(.easeInOut(duration: 0.25), value: vm.isResting)
         .animation(.easeInOut(duration: 0.25), value: vm.isWorkoutComplete)
         .onAppear { vm.startWorkout() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { vm.refresh() }
+        }
         .confirmationDialog("Quit Workout?", isPresented: $showingQuitConfirm, titleVisibility: .visible) {
-            Button("Quit Workout", role: .destructive) { dismiss() }
+            Button("Quit Workout", role: .destructive) {
+                RestNotifier.cancel()
+                dismiss()
+            }
             Button("Keep Going", role: .cancel) { }
         } message: {
             Text("Your progress won't be saved if you quit now.")
@@ -52,6 +62,9 @@ struct ActiveWorkoutView: View {
             Button("OK", role: .cancel) { dismiss() }
         } message: {
             Text("Your workout couldn't be saved due to a storage error. Please try again.")
+        }
+        .sheet(isPresented: $showingOverview) {
+            WorkoutOverviewView(vm: vm)
         }
     }
 
@@ -80,7 +93,9 @@ struct ActiveWorkoutView: View {
                                 target: vm.currentTarget(forExerciseIndex: index),
                                 logEntry: binding(for: index),
                                 isCurrent: index == vm.currentExerciseIndex,
-                                isSuperset: set.isSuperset
+                                isSuperset: set.isSuperset,
+                                slotLabel: set.isSuperset ? Self.slotLetter(index) : nil,
+                                focus: $fieldFocused
                             )
                         }
                     }
@@ -91,8 +106,21 @@ struct ActiveWorkoutView: View {
                 }
                 .padding(Spacing.md)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { fieldFocused = false }
+                }
+            }
         }
         .background(Color(.systemBackground))
+    }
+
+    /// "A", "B", "C" … for superset slot labels.
+    static func slotLetter(_ index: Int) -> String {
+        guard index >= 0, index < 26 else { return "\(index + 1)" }
+        return String(UnicodeScalar(UInt8(65 + index)))
     }
 
     // MARK: - Top Bar
@@ -123,8 +151,17 @@ struct ActiveWorkoutView: View {
 
             Spacer()
 
-            // Invisible placeholder to center title
-            Color.clear.frame(width: 36, height: 36)
+            // Workout overview (scroll the whole workout without losing your place)
+            Button {
+                showingOverview = true
+            } label: {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(Color.sfSurface)
+                    .clipShape(Circle())
+            }
         }
         .padding(.horizontal, Spacing.md)
         .padding(.vertical, Spacing.sm)
@@ -235,6 +272,109 @@ struct ActiveWorkoutView: View {
     }
 }
 
+// MARK: - Workout Overview
+// Read-only scroll of the whole workout with completed/current markers. Shown as a
+// sheet, so the timer keeps running and the workout position is untouched.
+
+struct WorkoutOverviewView: View {
+    let vm: ActiveWorkoutViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    ForEach(Array(vm.sortedSets.enumerated()), id: \.element.id) { setIndex, set in
+                        setCard(setIndex: setIndex, set: set)
+                    }
+                }
+                .padding(Spacing.md)
+            }
+            .navigationTitle(vm.workout.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+        }
+    }
+
+    private func setCard(setIndex: Int, set: WorkoutSet) -> some View {
+        let slots = set.sortedExercises
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(spacing: Spacing.xs) {
+                Text("Set \(setIndex + 1)").font(.sfSubhead).fontWeight(.semibold)
+                if set.isSuperset {
+                    Text("Superset")
+                        .font(.sfCaption2).fontWeight(.bold)
+                        .foregroundStyle(Color.sfAccent)
+                        .padding(.horizontal, Spacing.xs).padding(.vertical, 2)
+                        .background(Color.sfAccent.opacity(0.12)).clipShape(Capsule())
+                }
+                Spacer()
+            }
+
+            // Exercise legend (letters map to A/B in the round rows)
+            ForEach(Array(slots.enumerated()), id: \.element.id) { i, eis in
+                HStack(spacing: Spacing.xs) {
+                    if set.isSuperset {
+                        Text(ActiveWorkoutView.slotLetter(i))
+                            .font(.sfCaption2).fontWeight(.bold).foregroundStyle(.secondary)
+                            .frame(width: 16)
+                    }
+                    Text(eis.exerciseName).font(.sfCallout)
+                    Spacer()
+                }
+            }
+
+            Divider()
+
+            ForEach(Array(set.sortedRounds.enumerated()), id: \.element.id) { rIndex, round in
+                roundRow(setIndex: setIndex, roundIndex: rIndex, round: round, set: set)
+            }
+        }
+        .padding(Spacing.md)
+        .background(Color.sfSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+    }
+
+    private func roundRow(setIndex: Int, roundIndex: Int, round: SetRound, set: WorkoutSet) -> some View {
+        let global = vm.globalRoundIndex(setIndex: setIndex, roundIndex: roundIndex)
+        let done = global < vm.completedSetsCount
+        let current = global == vm.completedSetsCount
+        let slots = set.sortedExercises
+        return HStack(alignment: .top, spacing: Spacing.sm) {
+            Image(systemName: done ? "checkmark.circle.fill" : (current ? "arrowtriangle.right.circle.fill" : "circle"))
+                .font(.system(size: 18))
+                .foregroundStyle(done || current ? Color.sfAccent : Color.sfMuted)
+
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(slots.enumerated()), id: \.element.id) { i, eis in
+                    HStack(spacing: 4) {
+                        Text(set.isSuperset ? "\(roundIndex + 1)\(ActiveWorkoutView.slotLetter(i))" : "\(roundIndex + 1)")
+                            .font(.sfCaption2).fontWeight(.semibold).foregroundStyle(.secondary)
+                            .frame(minWidth: 18, alignment: .leading)
+                        Text(round.target(forSlot: eis.order)?.displaySummary ?? "—")
+                            .font(.sfCaption)
+                            .foregroundStyle(done ? .secondary : .primary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            if current {
+                Text("Current").font(.sfCaption2).fontWeight(.semibold).foregroundStyle(Color.sfAccent)
+            } else {
+                Label("\(round.restSeconds)s", systemImage: "timer")
+                    .font(.sfCaption2).foregroundStyle(.secondary)
+            }
+        }
+        .opacity(done ? 0.6 : 1)
+    }
+}
+
 // MARK: - Exercise Log Card
 
 struct ExerciseLogCard: View {
@@ -243,6 +383,8 @@ struct ExerciseLogCard: View {
     @Binding var logEntry: ExerciseLogEntry
     let isCurrent: Bool
     let isSuperset: Bool
+    var slotLabel: String? = nil
+    var focus: FocusState<Bool>.Binding
 
     @State private var repsText: String = ""
     @State private var weightText: String = ""
@@ -252,9 +394,20 @@ struct ExerciseLogCard: View {
             // Exercise name + target
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise.exerciseName)
-                        .font(.sfHeadline)
-                        .foregroundStyle(isCurrent ? Color.sfAccent : .primary)
+                    HStack(spacing: Spacing.xs) {
+                        if let slotLabel {
+                            Text(slotLabel)
+                                .font(.sfCaption2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .frame(width: 20, height: 20)
+                                .background(isCurrent ? Color.sfAccent : Color.sfMuted)
+                                .clipShape(Circle())
+                        }
+                        Text(exercise.exerciseName)
+                            .font(.sfHeadline)
+                            .foregroundStyle(isCurrent ? Color.sfAccent : .primary)
+                    }
 
                     if let target {
                         Text("Target: \(target.displaySummary)")
@@ -277,21 +430,10 @@ struct ExerciseLogCard: View {
 
             // Weight + Reps inputs
             HStack(spacing: Spacing.md) {
-                logField(
-                    icon: "scalemass",
-                    placeholder: "Weight",
-                    suffix: "lbs",
-                    text: $weightText
-                ) { val in
+                logField(icon: "scalemass", placeholder: "Weight", suffix: "lbs", text: $weightText) { val in
                     logEntry.weight = Double(val)
                 }
-
-                logField(
-                    icon: "repeat",
-                    placeholder: "Reps",
-                    suffix: "reps",
-                    text: $repsText
-                ) { val in
+                logField(icon: "repeat", placeholder: "Reps", suffix: "reps", text: $repsText) { val in
                     logEntry.reps = Int(val)
                 }
             }
@@ -331,6 +473,7 @@ struct ExerciseLogCard: View {
             HStack(spacing: 4) {
                 TextField("0", text: text)
                     .keyboardType(.decimalPad)
+                    .focused(focus)
                     .font(.sfCounter)
                     .fontWeight(.semibold)
                     .onChange(of: text.wrappedValue) { _, new in
