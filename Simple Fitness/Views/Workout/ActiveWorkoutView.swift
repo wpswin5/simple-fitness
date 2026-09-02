@@ -26,7 +26,8 @@ struct ActiveWorkoutView: View {
                     secondsRemaining: vm.restTimeRemaining,
                     totalSeconds: vm.currentRound?.restSeconds ?? 60,
                     nextUp: vm.nextUp,
-                    onSkip: { vm.skipRest() }
+                    onSkip: { vm.skipRest() },
+                    onShowOverview: { showingOverview = true }
                 )
                 .transition(.opacity)
             } else if vm.isWorkoutComplete {
@@ -52,6 +53,7 @@ struct ActiveWorkoutView: View {
         .confirmationDialog("Quit Workout?", isPresented: $showingQuitConfirm, titleVisibility: .visible) {
             Button("Quit Workout", role: .destructive) {
                 RestNotifier.cancel()
+                RestActivityController.end()
                 dismiss()
             }
             Button("Keep Going", role: .cancel) { }

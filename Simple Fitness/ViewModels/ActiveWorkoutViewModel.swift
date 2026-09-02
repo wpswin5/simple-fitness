@@ -188,6 +188,7 @@ final class ActiveWorkoutViewModel {
 
     func completeWorkout() {
         RestNotifier.cancel()
+        RestActivityController.end()
         stopTicker()
         isResting = false
         restEndDate = nil
@@ -275,6 +276,13 @@ final class ActiveWorkoutViewModel {
         restTimeRemaining = seconds
         isResting = true
         RestNotifier.scheduleRestOver(at: end)
+        let next = nextUp
+        RestActivityController.start(
+            workoutName: workout.name,
+            endDate: end,
+            nextUpLabel: next?.label ?? "",
+            nextUpTitle: next?.title ?? "Next set"
+        )
     }
 
     func skipRest() {
@@ -285,6 +293,7 @@ final class ActiveWorkoutViewModel {
     /// Ends rest and advances. Called on skip and when the rest interval elapses.
     private func finishResting() {
         RestNotifier.cancel()
+        RestActivityController.end()
         restEndDate = nil
         isResting = false
         restTimeRemaining = 0
@@ -308,5 +317,6 @@ final class ActiveWorkoutViewModel {
     deinit {
         ticker?.invalidate()
         RestNotifier.cancel()
+        RestActivityController.end()
     }
 }

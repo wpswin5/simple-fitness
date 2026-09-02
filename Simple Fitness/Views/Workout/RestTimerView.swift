@@ -5,6 +5,7 @@ struct RestTimerView: View {
     let totalSeconds: Int
     let nextUp: NextUpInfo?
     let onSkip: () -> Void
+    var onShowOverview: (() -> Void)? = nil
 
     private var progress: Double {
         guard totalSeconds > 0 else { return 1 }
@@ -90,6 +91,22 @@ struct RestTimerView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .overlay(alignment: .topTrailing) {
+            if let onShowOverview {
+                Button {
+                    onShowOverview()
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .background(Color.sfSurface)
+                        .clipShape(Circle())
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.top, Spacing.sm)
+            }
+        }
     }
 }
 
