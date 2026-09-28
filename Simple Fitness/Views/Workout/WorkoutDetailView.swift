@@ -79,7 +79,7 @@ struct WorkoutDetailView: View {
 
     private var setsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            Text("Sets")
+            Text("Exercises")
                 .font(.sfSubhead)
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -88,7 +88,7 @@ struct WorkoutDetailView: View {
             if workout.sortedSets.isEmpty {
                 HStack {
                     Spacer()
-                    Text("No sets configured.")
+                    Text("No exercises configured.")
                         .font(.sfCallout)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -106,22 +106,13 @@ struct WorkoutDetailView: View {
 
     private func setCard(index: Int, set: WorkoutSet) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            // Set header
+            // Block header ("Superset" or the exercise below); each row is one set.
             HStack {
-                HStack(spacing: Spacing.xs) {
-                    Text("Set \(index + 1)")
+                if set.isSuperset {
+                    Text("Superset")
                         .font(.sfSubhead)
                         .fontWeight(.semibold)
-                    if set.isSuperset {
-                        Text("Superset")
-                            .font(.sfCaption2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.sfAccent)
-                            .padding(.horizontal, Spacing.xs)
-                            .padding(.vertical, 2)
-                            .background(Color.sfAccent.opacity(0.12))
-                            .clipShape(Capsule())
-                    }
+                        .foregroundStyle(Color.sfAccent)
                 }
                 Spacer()
                 Text("\(set.roundCount) set\(set.roundCount == 1 ? "" : "s")")

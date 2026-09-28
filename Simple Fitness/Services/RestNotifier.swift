@@ -13,15 +13,14 @@ import UserNotifications
 // sound while the app is active): if the user is watching the rest screen the UI
 // already advances at 0, so a foreground alert would just be a redundant double-beep.
 
-enum RestNotifier {
+nonisolated enum RestNotifier {
     private static let identifier = "rest-over"
 
     /// Ask once (first workout). No-op if already decided.
     static func requestAuthorizationIfNeeded() {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { settings in
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .notDetermined else { return }
-            center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
     }
 

@@ -21,7 +21,7 @@ struct RestActivityLiveActivity: Widget {
                     }
                 }
                 Spacer()
-                Text(timerInterval: Date()...context.state.endDate, countsDown: true)
+                RestCountdown(endDate: context.state.endDate, isStale: context.isStale)
                     .font(.system(.title, design: .rounded).monospacedDigit())
                     .fontWeight(.bold)
                     .multilineTextAlignment(.trailing)
@@ -37,7 +37,7 @@ struct RestActivityLiveActivity: Widget {
                     Label("Rest", systemImage: "timer").font(.caption)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(timerInterval: Date()...context.state.endDate, countsDown: true)
+                    RestCountdown(endDate: context.state.endDate, isStale: context.isStale)
                         .font(.system(.title3, design: .rounded).monospacedDigit())
                         .multilineTextAlignment(.trailing)
                         .frame(width: 68)
@@ -52,7 +52,7 @@ struct RestActivityLiveActivity: Widget {
             } compactLeading: {
                 Image(systemName: "timer")
             } compactTrailing: {
-                Text(timerInterval: Date()...context.state.endDate, countsDown: true)
+                RestCountdown(endDate: context.state.endDate, isStale: context.isStale)
                     .monospacedDigit()
                     .frame(width: 44)
             } minimal: {
@@ -62,3 +62,20 @@ struct RestActivityLiveActivity: Widget {
     }
 }
 
+
+/// Self-updating countdown to `endDate`. The app can't end the activity while it's
+/// suspended, so once rest is over (stale) show "Go" instead of a frozen 0:00.
+/// The range is clamped: `Date()...endDate` traps if the view renders after `endDate`.
+private struct RestCountdown: View {
+    let endDate: Date
+    let isStale: Bool
+
+    var body: some View {
+        let now = Date()
+        if isStale || endDate <= now {
+            Text("Go")
+        } else {
+            Text(timerInterval: now...endDate, countsDown: true)
+        }
+    }
+}

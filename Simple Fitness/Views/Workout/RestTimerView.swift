@@ -6,6 +6,7 @@ struct RestTimerView: View {
     let nextUp: NextUpInfo?
     let onSkip: () -> Void
     var onShowOverview: (() -> Void)? = nil
+    var onQuit: (() -> Void)? = nil
 
     private var progress: Double {
         guard totalSeconds > 0 else { return 1 }
@@ -91,6 +92,23 @@ struct RestTimerView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .overlay(alignment: .topLeading) {
+            if let onQuit {
+                Button {
+                    onQuit()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .background(Color.sfSurface)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Quit workout")
+                .padding(.horizontal, Spacing.md)
+                .padding(.top, Spacing.sm)
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if let onShowOverview {
                 Button {
@@ -114,7 +132,7 @@ struct RestTimerView: View {
     RestTimerView(
         secondsRemaining: 45,
         totalSeconds: 90,
-        nextUp: NextUpInfo(label: "Set 3 of 12", title: "Overhead Press", detail: "8 reps · 95 lb · 70%", isSuperset: false),
+        nextUp: NextUpInfo(label: "Set 1 of 3", title: "Overhead Press", detail: "8 reps · 95 lb · 70%", isSuperset: false),
         onSkip: {}
     )
 }

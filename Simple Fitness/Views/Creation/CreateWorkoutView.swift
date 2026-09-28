@@ -121,10 +121,11 @@ struct CreateWorkoutView: View {
     private var setsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
-                sectionHeader("Sets")
+                sectionHeader("Exercises")
                 Spacer()
                 if !vm.draftSets.isEmpty {
-                    Text("\(vm.draftSets.count) set\(vm.draftSets.count == 1 ? "" : "s")")
+                    let count = vm.draftSets.reduce(0) { $0 + $1.exercises.count }
+                    Text("\(count) exercise\(count == 1 ? "" : "s")")
                         .font(.sfCaption)
                         .foregroundStyle(.secondary)
                 }
@@ -136,14 +137,14 @@ struct CreateWorkoutView: View {
                 setList
             }
 
-            // Add Set button
+            // Add Exercise button
             Button {
                 showingAddSet = true
             } label: {
                 HStack {
                     Image(systemName: "plus.circle.fill")
                         .foregroundStyle(Color.sfAccent)
-                    Text("Add Set")
+                    Text("Add Exercise")
                         .foregroundStyle(Color.sfAccent)
                         .fontWeight(.semibold)
                     Spacer()
@@ -164,7 +165,7 @@ struct CreateWorkoutView: View {
                 Image(systemName: "list.bullet.clipboard")
                     .font(.system(size: 32))
                     .foregroundStyle(Color.sfAccent.opacity(0.5))
-                Text("No sets yet. Tap below to add your first.")
+                Text("No exercises yet. Tap below to add your first.")
                     .font(.sfCallout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

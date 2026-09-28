@@ -27,7 +27,8 @@ struct ActiveWorkoutView: View {
                     totalSeconds: vm.currentRound?.restSeconds ?? 60,
                     nextUp: vm.nextUp,
                     onSkip: { vm.skipRest() },
-                    onShowOverview: { showingOverview = true }
+                    onShowOverview: { showingOverview = true },
+                    onQuit: { showingQuitConfirm = true }
                 )
                 .transition(.opacity)
             } else if vm.isWorkoutComplete {
@@ -89,7 +90,9 @@ struct ActiveWorkoutView: View {
 
                     // Exercise cards (one per exercise slot in the current round)
                     if let set = vm.currentSet {
-                        ForEach(Array(vm.currentSlots.enumerated()), id: \.offset) { index, slot in
+                        // Keyed by set/round so each round gets fresh input fields (a card
+                        // reused across rounds would show stale text but log the new targets).
+                        ForEach(Array(vm.currentSlots.enumerated()), id: \.element.id) { index, slot in
                             ExerciseLogCard(
                                 exercise: slot,
                                 target: vm.currentTarget(forExerciseIndex: index),
@@ -99,6 +102,7 @@ struct ActiveWorkoutView: View {
                                 slotLabel: set.isSuperset ? Self.slotLetter(index) : nil,
                                 focus: $fieldFocused
                             )
+                            .id("\(vm.currentSetIndex)-\(vm.currentRoundIndex)-\(index)")
                         }
                     }
 
@@ -191,7 +195,9 @@ struct ActiveWorkoutView: View {
     private var setHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Set \(vm.completedSetsCount + 1) of \(vm.totalSets)")
+                // "Set" = one round of the current exercise; overall progress is below
+                // (and in the bar), so the numbering matches the overview and editor.
+                Text("Set \(vm.currentRoundIndex + 1) of \(vm.currentSetRoundCount)")
                     .font(.sfTitle)
 
                 if let set = vm.currentSet, set.isSuperset {
@@ -201,11 +207,9 @@ struct ActiveWorkoutView: View {
                         .fontWeight(.semibold)
                 }
 
-                if vm.currentSetRoundCount > 1 {
-                    Text("Round \(vm.currentRoundIndex + 1) of \(vm.currentSetRoundCount)")
-                        .font(.sfCaption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("\(vm.completedSetsCount) of \(vm.totalSets) sets done")
+                    .font(.sfCaption)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -303,36 +307,35 @@ struct WorkoutOverviewView: View {
     }
 
     private func setCard(setIndex: Int, set: WorkoutSet) -> some View {
-        let slots = set.sortedExercises
+        let slots = vm.slots(forSet: setIndex)
         return VStack(alignment: .leading, spacing: Spacing.sm) {
+            // Header is the exercise itself; each row below is one of its sets.
             HStack(spacing: Spacing.xs) {
-                Text("Set \(setIndex + 1)").font(.sfSubhead).fontWeight(.semibold)
-                if set.isSuperset {
-                    Text("Superset")
-                        .font(.sfCaption2).fontWeight(.bold)
-                        .foregroundStyle(Color.sfAccent)
-                        .padding(.horizontal, Spacing.xs).padding(.vertical, 2)
-                        .background(Color.sfAccent.opacity(0.12)).clipShape(Capsule())
-                }
+                Text(set.isSuperset ? "Superset" : (slots.first?.exerciseName ?? "Exercise"))
+                    .font(.sfSubhead).fontWeight(.semibold)
+                    .foregroundStyle(set.isSuperset ? Color.sfAccent : .primary)
                 Spacer()
+                let count = vm.rounds(forSet: setIndex).count
+                Text("\(count) set\(count == 1 ? "" : "s")")
+                    .font(.sfCaption).foregroundStyle(.secondary)
             }
 
-            // Exercise legend (letters map to A/B in the round rows)
-            ForEach(Array(slots.enumerated()), id: \.element.id) { i, eis in
-                HStack(spacing: Spacing.xs) {
-                    if set.isSuperset {
+            // Superset legend (letters map to A/B in the set rows)
+            if set.isSuperset {
+                ForEach(Array(slots.enumerated()), id: \.element.id) { i, eis in
+                    HStack(spacing: Spacing.xs) {
                         Text(ActiveWorkoutView.slotLetter(i))
                             .font(.sfCaption2).fontWeight(.bold).foregroundStyle(.secondary)
                             .frame(width: 16)
+                        Text(eis.exerciseName).font(.sfCallout)
+                        Spacer()
                     }
-                    Text(eis.exerciseName).font(.sfCallout)
-                    Spacer()
                 }
             }
 
             Divider()
 
-            ForEach(Array(set.sortedRounds.enumerated()), id: \.element.id) { rIndex, round in
+            ForEach(Array(vm.rounds(forSet: setIndex).enumerated()), id: \.element.id) { rIndex, round in
                 roundRow(setIndex: setIndex, roundIndex: rIndex, round: round, set: set)
             }
         }
@@ -345,7 +348,7 @@ struct WorkoutOverviewView: View {
         let global = vm.globalRoundIndex(setIndex: setIndex, roundIndex: roundIndex)
         let done = global < vm.completedSetsCount
         let current = global == vm.completedSetsCount
-        let slots = set.sortedExercises
+        let slots = vm.slots(forSet: setIndex)
         return HStack(alignment: .top, spacing: Spacing.sm) {
             Image(systemName: done ? "checkmark.circle.fill" : (current ? "arrowtriangle.right.circle.fill" : "circle"))
                 .font(.system(size: 18))
@@ -432,10 +435,11 @@ struct ExerciseLogCard: View {
 
             // Weight + Reps inputs
             HStack(spacing: Spacing.md) {
-                logField(icon: "scalemass", placeholder: "Weight", suffix: "lbs", text: $weightText) { val in
-                    logEntry.weight = Double(val)
+                logField(icon: "scalemass", placeholder: "Weight", suffix: "lbs", text: $weightText, keyboard: .decimalPad) { val in
+                    // Accept a comma decimal separator (e.g. "22,5" on EU keyboards).
+                    logEntry.weight = Double(val.replacingOccurrences(of: ",", with: "."))
                 }
-                logField(icon: "repeat", placeholder: "Reps", suffix: "reps", text: $repsText) { val in
+                logField(icon: "repeat", placeholder: "Reps", suffix: "reps", text: $repsText, keyboard: .numberPad) { val in
                     logEntry.reps = Int(val)
                 }
             }
@@ -460,6 +464,7 @@ struct ExerciseLogCard: View {
         placeholder: String,
         suffix: String,
         text: Binding<String>,
+        keyboard: UIKeyboardType,
         onChange: @escaping (String) -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -474,7 +479,7 @@ struct ExerciseLogCard: View {
 
             HStack(spacing: 4) {
                 TextField("0", text: text)
-                    .keyboardType(.decimalPad)
+                    .keyboardType(keyboard)
                     .focused(focus)
                     .font(.sfCounter)
                     .fontWeight(.semibold)

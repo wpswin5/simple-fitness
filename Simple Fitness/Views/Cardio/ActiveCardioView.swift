@@ -6,6 +6,7 @@ import SwiftData
 struct ActiveCardioView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var vm: ActiveCardioViewModel
     @State private var showingQuitConfirm = false
@@ -31,6 +32,9 @@ struct ActiveCardioView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: vm.isComplete)
         .onAppear { vm.start() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { vm.refresh() }
+        }
         .confirmationDialog("End Session?", isPresented: $showingQuitConfirm, titleVisibility: .visible) {
             Button("End Session", role: .destructive) { dismiss() }
             Button("Keep Going", role: .cancel) { }

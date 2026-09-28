@@ -8,7 +8,7 @@ import ActivityKit
 // and end it. No-ops safely when Live Activities are disabled or the widget
 // extension isn't present yet.
 
-enum RestActivityController {
+nonisolated enum RestActivityController {
 
     static func start(workoutName: String, endDate: Date, nextUpLabel: String, nextUpTitle: String) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
@@ -23,7 +23,7 @@ enum RestActivityController {
         do {
             _ = try Activity.request(
                 attributes: attributes,
-                content: .init(state: state, staleDate: endDate.addingTimeInterval(2)),
+                content: .init(state: state, staleDate: endDate),   // widget flips to "Go" at the end
                 pushType: nil
             )
         } catch {

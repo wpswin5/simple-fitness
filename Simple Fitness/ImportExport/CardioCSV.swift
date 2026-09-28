@@ -113,9 +113,9 @@ enum CardioCSV {
                 String(i + 1),
                 iv.label,
                 (iv.isRest ? CardioIntensity.rest : iv.intensity).rawValue,
-                iv.durationSeconds.map(clock) ?? "",
+                iv.durationSeconds.map { clock($0) } ?? "",
                 iv.distanceValue.map { $0.weightFormatted } ?? "",
-                iv.paceSecondsPerUnit.map(clock) ?? "",
+                iv.paceSecondsPerUnit.map { clock($0) } ?? "",
                 iv.inclinePercent.map { $0.weightFormatted } ?? "",
             ]))
         }

@@ -9,7 +9,7 @@ import ActivityKit
 // extension, select this file in Xcode and tick the widget target under
 // "Target Membership" in the File Inspector.
 
-struct RestActivityAttributes: ActivityAttributes {
+nonisolated struct RestActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         /// When the rest period ends — drives the live countdown via Text(timerInterval:).
         var endDate: Date

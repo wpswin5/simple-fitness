@@ -23,13 +23,20 @@ final class ActiveCardioViewModel {
     private(set) var isComplete: Bool = false
     private(set) var startDate: Date = Date()
 
-    nonisolated(unsafe) private var timer: Timer?
+    // Time comes from the wall clock (the timer only drives the UI), so a locked phone
+    // or backgrounded app never freezes the session; missed segments catch up on return.
+    @ObservationIgnored nonisolated(unsafe) private var timer: Timer?
+    @ObservationIgnored private var segmentStartDate: Date = Date()
+    @ObservationIgnored private var hasStarted = false
+    /// Actual time spent in each segment, recorded as it ends (nil = not reached).
+    @ObservationIgnored private var actualDurations: [Int?] = []
 
     // MARK: - Init
 
     init(template: CardioTemplate) {
         self.template = template
         self.segments = template.sortedIntervals
+        self.actualDurations = Array(repeating: nil, count: segments.count)
     }
 
     // MARK: - Computed
@@ -68,22 +75,55 @@ final class ActiveCardioViewModel {
     // MARK: - Lifecycle
 
     func start() {
+        guard !hasStarted else { return }
+        hasStarted = true
         startDate = Date()
+        segmentStartDate = startDate
         elapsedSeconds = 0
         segmentElapsed = 0
         startTimer()
     }
 
+    /// Manual advance ("Next Segment"): the next segment starts now.
     func advance() {
+        moveToNextSegment(startingAt: Date())
+    }
+
+    private func moveToNextSegment(startingAt date: Date) {
+        if currentIndex < actualDurations.count {
+            actualDurations[currentIndex] = max(0, Int(date.timeIntervalSince(segmentStartDate).rounded()))
+        }
         if currentIndex + 1 < segments.count {
             currentIndex += 1
+            segmentStartDate = date
             segmentElapsed = 0
         } else {
-            complete()
+            complete(at: date)
         }
     }
 
-    func complete() {
+    /// Recompute from the wall clock. Called every tick and on returning to the foreground.
+    func refresh() {
+        guard hasStarted, !isComplete else { return }
+        let now = Date()
+        // Timed segments that ended while we weren't ticking advance back-to-back,
+        // each starting exactly when the previous one ended.
+        while !isComplete, let dur = currentSegmentDuration,
+              now.timeIntervalSince(segmentStartDate) >= TimeInterval(dur) {
+            moveToNextSegment(startingAt: segmentStartDate.addingTimeInterval(TimeInterval(dur)))
+        }
+        guard !isComplete else { return }
+        let elapsed = max(0, Int(now.timeIntervalSince(startDate)))
+        if elapsed != elapsedSeconds { elapsedSeconds = elapsed }
+        let segElapsed = max(0, Int(now.timeIntervalSince(segmentStartDate)))
+        if segElapsed != segmentElapsed { segmentElapsed = segElapsed }
+    }
+
+    /// `date` is when the session actually ended — for a timed final segment that
+    /// finished while the phone was locked, that's its end, not when the app woke up.
+    func complete(at date: Date = Date()) {
+        guard !isComplete else { return }
+        elapsedSeconds = max(0, Int(date.timeIntervalSince(startDate)))
         stopTimer()
         isComplete = true
     }
@@ -92,18 +132,11 @@ final class ActiveCardioViewModel {
 
     private func startTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.tick() }
+        let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refresh() }
         }
-    }
-
-    private func tick() {
-        guard !isComplete else { return }
-        elapsedSeconds += 1
-        segmentElapsed += 1
-        if let dur = currentSegmentDuration, segmentElapsed >= dur {
-            advance()
-        }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
     }
 
     private func stopTimer() {
@@ -127,7 +160,8 @@ final class ActiveCardioViewModel {
 
         log.splits = segments.enumerated().map { idx, seg in
             let split = CardioSplit(order: idx, label: seg.label, isRest: seg.isRest)
-            split.durationSeconds = seg.durationSeconds
+            // Prefer the measured time (distance/open segments have no planned duration).
+            split.durationSeconds = idx < actualDurations.count ? actualDurations[idx] ?? seg.durationSeconds : seg.durationSeconds
             split.distanceValue = seg.distanceValue
             return split
         }
