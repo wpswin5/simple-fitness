@@ -1,20 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// REFERENCE FILE — do NOT leave this in the "Simple Fitness" app-source folder.
-// It lives here (outside the app target) only so you can copy it.
-//
-// After you create the Widget Extension target ("RestActivity", with "Include
-// Live Activity" checked), REPLACE the entire contents of the generated
-// `RestActivityLiveActivity.swift` with everything below this comment block.
-//
-// Then:
-//   1. Delete the sample `RestActivityAttributes` struct that Xcode generated
-//      (this widget uses the SHARED one in Simple Fitness/RestActivityAttributes.swift).
-//   2. Select Simple Fitness/RestActivityAttributes.swift → File Inspector →
-//      tick the "RestActivity" target under Target Membership.
-//   3. Set the RestActivity target's iOS Deployment Target to 26.4 (match the app).
-//   4. The generated `RestActivityBundle.swift` (@main WidgetBundle) is fine as-is.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import ActivityKit
 import WidgetKit
 import SwiftUI
@@ -78,3 +61,4 @@ struct RestActivityLiveActivity: Widget {
         }
     }
 }
+

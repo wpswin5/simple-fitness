@@ -6,19 +6,89 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F3A1093F3069FD93007EF851 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F3A1093E3069FD93007EF851 /* WidgetKit.framework */; };
+		F3A109413069FD93007EF851 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F3A109403069FD93007EF851 /* SwiftUI.framework */; };
+		F3A109503069FD94007EF851 /* RestActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F3A1093C3069FD93007EF851 /* RestActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F3A1094E3069FD94007EF851 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F3DDF2C92FBA8A8900CDCCF6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F3A1093B3069FD93007EF851;
+			remoteInfo = RestActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F3A109513069FD94007EF851 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F3A109503069FD94007EF851 /* RestActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		F3A1093C3069FD93007EF851 /* RestActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F3A1093E3069FD93007EF851 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		F3A109403069FD93007EF851 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		F3DDF2D12FBA8A8900CDCCF6 /* Simple Fitness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simple Fitness.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F3A109543069FD94007EF851 /* Exceptions for "RestActivity" folder in "RestActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F3A1093B3069FD93007EF851 /* RestActivityExtension */;
+		};
+		F3A109573069FE3E007EF851 /* Exceptions for "Simple Fitness" folder in "RestActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				RestActivityAttributes.swift,
+			);
+			target = F3A1093B3069FD93007EF851 /* RestActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		F3A109423069FD93007EF851 /* RestActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F3A109543069FD94007EF851 /* Exceptions for "RestActivity" folder in "RestActivityExtension" target */,
+			);
+			path = RestActivity;
+			sourceTree = "<group>";
+		};
 		F3DDF2D32FBA8A8900CDCCF6 /* Simple Fitness */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F3A109573069FE3E007EF851 /* Exceptions for "Simple Fitness" folder in "RestActivityExtension" target */,
+			);
 			path = "Simple Fitness";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		F3A109393069FD93007EF851 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F3A109413069FD93007EF851 /* SwiftUI.framework in Frameworks */,
+				F3A1093F3069FD93007EF851 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F3DDF2CE2FBA8A8900CDCCF6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -29,10 +99,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F3A1093D3069FD93007EF851 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F3A1093E3069FD93007EF851 /* WidgetKit.framework */,
+				F3A109403069FD93007EF851 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		F3DDF2C82FBA8A8900CDCCF6 = {
 			isa = PBXGroup;
 			children = (
 				F3DDF2D32FBA8A8900CDCCF6 /* Simple Fitness */,
+				F3A109423069FD93007EF851 /* RestActivity */,
+				F3A1093D3069FD93007EF851 /* Frameworks */,
 				F3DDF2D22FBA8A8900CDCCF6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				F3DDF2D12FBA8A8900CDCCF6 /* Simple Fitness.app */,
+				F3A1093C3069FD93007EF851 /* RestActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +130,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		F3A1093B3069FD93007EF851 /* RestActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3A109553069FD94007EF851 /* Build configuration list for PBXNativeTarget "RestActivityExtension" */;
+			buildPhases = (
+				F3A109383069FD93007EF851 /* Sources */,
+				F3A109393069FD93007EF851 /* Frameworks */,
+				F3A1093A3069FD93007EF851 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F3A109423069FD93007EF851 /* RestActivity */,
+			);
+			name = RestActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = RestActivityExtension;
+			productReference = F3A1093C3069FD93007EF851 /* RestActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		F3DDF2D02FBA8A8900CDCCF6 /* Simple Fitness */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F3DDF2DC2FBA8A8A00CDCCF6 /* Build configuration list for PBXNativeTarget "Simple Fitness" */;
@@ -55,10 +159,12 @@
 				F3DDF2CD2FBA8A8900CDCCF6 /* Sources */,
 				F3DDF2CE2FBA8A8900CDCCF6 /* Frameworks */,
 				F3DDF2CF2FBA8A8900CDCCF6 /* Resources */,
+				F3A109513069FD94007EF851 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F3A1094F3069FD94007EF851 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F3DDF2D32FBA8A8900CDCCF6 /* Simple Fitness */,
@@ -77,9 +183,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2640;
+				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					F3A1093B3069FD93007EF851 = {
+						CreatedOnToolsVersion = 26.6;
+					};
 					F3DDF2D02FBA8A8900CDCCF6 = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -100,11 +209,19 @@
 			projectRoot = "";
 			targets = (
 				F3DDF2D02FBA8A8900CDCCF6 /* Simple Fitness */,
+				F3A1093B3069FD93007EF851 /* RestActivityExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		F3A1093A3069FD93007EF851 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F3DDF2CF2FBA8A8900CDCCF6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +232,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F3A109383069FD93007EF851 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F3DDF2CD2FBA8A8900CDCCF6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +248,79 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		F3A1094F3069FD94007EF851 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F3A1093B3069FD93007EF851 /* RestActivityExtension */;
+			targetProxy = F3A1094E3069FD94007EF851 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		F3A109523069FD94007EF851 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A45Z828W39;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RestActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RestActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.willswindell.simplefitness.RestActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F3A109533069FD94007EF851 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A45Z828W39;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RestActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RestActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.willswindell.simplefitness.RestActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		F3DDF2DA2FBA8A8A00CDCCF6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -319,6 +515,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F3A109553069FD94007EF851 /* Build configuration list for PBXNativeTarget "RestActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F3A109523069FD94007EF851 /* Debug */,
+				F3A109533069FD94007EF851 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F3DDF2CC2FBA8A8900CDCCF6 /* Build configuration list for PBXProject "Simple Fitness" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
