@@ -79,7 +79,7 @@ struct WorkoutDetailView: View {
 
     private var setsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            Text("Sets")
+            Text("Exercises")
                 .font(.sfSubhead)
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -88,7 +88,7 @@ struct WorkoutDetailView: View {
             if workout.sortedSets.isEmpty {
                 HStack {
                     Spacer()
-                    Text("No sets configured.")
+                    Text("No exercises configured.")
                         .font(.sfCallout)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -106,22 +106,13 @@ struct WorkoutDetailView: View {
 
     private func setCard(index: Int, set: WorkoutSet) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            // Set header
+            // Block header ("Superset" or the exercise below); each row is one set.
             HStack {
-                HStack(spacing: Spacing.xs) {
-                    Text("Set \(index + 1)")
+                if set.isSuperset {
+                    Text("Superset")
                         .font(.sfSubhead)
                         .fontWeight(.semibold)
-                    if set.isSuperset {
-                        Text("Superset")
-                            .font(.sfCaption2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.sfAccent)
-                            .padding(.horizontal, Spacing.xs)
-                            .padding(.vertical, 2)
-                            .background(Color.sfAccent.opacity(0.12))
-                            .clipShape(Capsule())
-                    }
+                        .foregroundStyle(Color.sfAccent)
                 }
                 Spacer()
                 Text("\(set.roundCount) set\(set.roundCount == 1 ? "" : "s")")
@@ -129,14 +120,22 @@ struct WorkoutDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Exercise names
+            // Exercise names (lettered A/B… in supersets)
             VStack(spacing: Spacing.xs) {
-                ForEach(set.sortedExercises, id: \.id) { eis in
+                ForEach(Array(set.sortedExercises.enumerated()), id: \.element.id) { i, eis in
                     HStack(spacing: Spacing.sm) {
-                        Image(systemName: "dumbbell.fill")
-                            .font(.sfCaption2)
-                            .foregroundStyle(Color.sfAccent)
-                            .frame(width: 18)
+                        if set.isSuperset {
+                            Text(ActiveWorkoutView.slotLetter(i))
+                                .font(.sfCaption2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.sfAccent)
+                                .frame(width: 18)
+                        } else {
+                            Image(systemName: "dumbbell.fill")
+                                .font(.sfCaption2)
+                                .foregroundStyle(Color.sfAccent)
+                                .frame(width: 18)
+                        }
                         Text(eis.exerciseName)
                             .font(.sfCallout)
                             .foregroundStyle(.primary)
@@ -175,12 +174,13 @@ struct WorkoutDetailView: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(set.sortedExercises, id: \.id) { eis in
+                ForEach(Array(set.sortedExercises.enumerated()), id: \.element.id) { i, eis in
                     HStack(spacing: 4) {
                         if set.isSuperset {
-                            Text(eis.exerciseName + ":")
+                            Text("\(index + 1)\(ActiveWorkoutView.slotLetter(i))")
                                 .font(.sfCaption2)
-                                .foregroundStyle(.secondary)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.sfAccent)
                         }
                         Text(round.target(forSlot: eis.order)?.displaySummary ?? "—")
                             .font(.sfCaption)

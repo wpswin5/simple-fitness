@@ -238,7 +238,7 @@ struct GenerateWorkoutView: View {
             intensity: intensity,
             notes: notes
         )
-        let library = allExercises.map(LibraryExercise.init)
+        let library = allExercises.map { LibraryExercise($0) }
         let generator = makeGenerator()
 
         Task {

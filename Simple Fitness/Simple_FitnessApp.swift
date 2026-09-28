@@ -38,6 +38,11 @@ struct Simple_FitnessApp: App {
                 fatalError("Could not create ModelContainer after resetting store: \(error)")
             }
         }
+
+        // Workout state is in-memory, so nothing is mid-rest at launch. Clear any rest
+        // alert / Lock Screen countdown left behind if the app was killed during a rest.
+        RestNotifier.cancel()
+        RestActivityController.end()
     }
 
     /// Removes the SwiftData store files backing a configuration so a fresh, empty

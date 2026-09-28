@@ -25,6 +25,26 @@ final class SeedDataManager {
         }
     }
 
+    /// Workouts created before per-set rounds existed (v1.0) migrated with sets but no
+    /// rounds: they show "0 sets" and can't log anything. Give each such set the single
+    /// round v1.0 implied (setRepetitions defaulted to 1) with a blank target per
+    /// exercise. The old per-exercise targets were dropped by the migration, so the
+    /// targets start unspecified. Idempotent — only touches sets with no rounds.
+    func repairLegacyWorkouts() {
+        guard let sets = try? context.fetch(FetchDescriptor<WorkoutSet>()) else { return }
+        var repaired = false
+        for set in sets where set.rounds.isEmpty && !set.exercises.isEmpty {
+            let targets = set.sortedExercises.map {
+                ExerciseTarget(order: $0.order, exerciseName: $0.exerciseName)
+            }
+            let round = SetRound(order: 0, restSeconds: 60, targets: targets)
+            context.insert(round)
+            set.rounds = [round]
+            repaired = true
+        }
+        if repaired { try? context.save() }
+    }
+
     private func seed() {
         // MARK: Exercises
         let benchPress  = makeExercise("Bench Press",       muscle: .chest,      equipment: "Barbell")

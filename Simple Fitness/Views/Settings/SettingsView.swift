@@ -153,30 +153,29 @@ struct SettingsView: View {
     }
 
     private func resetAllData() {
-        deleteAll(ExerciseLog.self)
-        deleteAll(WorkoutSetLog.self)
-        deleteAll(WorkoutLog.self)
-        deleteAll(ExerciseInSet.self)
-        deleteAll(WorkoutSet.self)
-        deleteAll(Workout.self)
-        deleteAll(ProgramDayActivity.self)
-        deleteAll(ProgramDay.self)
-        deleteAll(ProgramWeek.self)
-        deleteAll(Program.self)
-        deleteAll(ProgramRegistration.self)
-        deleteAll(UserProfile.self)
-        deleteAll(Exercise.self)
-        deleteAll(CardioSplit.self)
-        deleteAll(SwimSet.self)
-        deleteAll(CardioLog.self)
-        deleteAll(CardioTemplateInterval.self)
-        deleteAll(CardioTemplate.self)
-        try? modelContext.save()
-    }
-
-    private func deleteAll<T: PersistentModel>(_ type: T.Type) {
-        guard let items = try? modelContext.fetch(FetchDescriptor<T>()) else { return }
-        items.forEach { modelContext.delete($0) }
+        // Delete on a throwaway CHILD context, then save. This sends clean deletion
+        // notifications to the main context's @Query views, instead of leaving
+        // just-deleted objects that a still-alive view (e.g. the Cardio tab) would
+        // render and fault on — which crashes on enum attributes like
+        // CardioTemplate.structureType.
+        //
+        // Aggregate ROOTS only; SwiftData cascade removes their children. (Deleting
+        // children explicitly too would double-delete via cascade.)
+        let ctx = ModelContext(modelContext.container)
+        func wipe<T: PersistentModel>(_ type: T.Type) {
+            if let items = try? ctx.fetch(FetchDescriptor<T>()) {
+                items.forEach { ctx.delete($0) }
+            }
+        }
+        wipe(WorkoutLog.self)
+        wipe(CardioLog.self)
+        wipe(ProgramRegistration.self)
+        wipe(Program.self)
+        wipe(Workout.self)
+        wipe(CardioTemplate.self)
+        wipe(Exercise.self)
+        wipe(UserProfile.self)
+        try? ctx.save()
     }
 
     // MARK: - Import

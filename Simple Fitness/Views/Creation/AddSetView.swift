@@ -42,7 +42,7 @@ struct AddSetView: View {
                         roundsSection
                     }
 
-                    Button(existingDraft == nil ? "Add Set" : "Update Set") {
+                    Button(existingDraft == nil ? "Add Exercise" : "Update Exercise") {
                         onSave(draft)
                         dismiss()
                     }
@@ -52,7 +52,7 @@ struct AddSetView: View {
                 }
                 .padding(Spacing.md)
             }
-            .navigationTitle(existingDraft == nil ? "New Set" : "Edit Set")
+            .navigationTitle(existingDraft == nil ? "New Exercise" : "Edit Exercise")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -344,44 +344,55 @@ struct AddSetView: View {
     }
 
     // MARK: - Bindings into draft.rounds[roundIndex].targets[exIndex]
+    // Bounds-checked: after an exercise or round is removed, SwiftUI can still read a
+    // row's binding once during the removal animation — a raw subscript would crash.
+
+    private func hasTarget(_ roundIndex: Int, _ exIndex: Int) -> Bool {
+        roundIndex < draft.rounds.count && exIndex < draft.rounds[roundIndex].targets.count
+    }
 
     private func binding(reps roundIndex: Int, _ exIndex: Int) -> Binding<Int> {
         Binding(
-            get: { draft.rounds[roundIndex].targets[exIndex].targetReps ?? 8 },
-            set: { draft.rounds[roundIndex].targets[exIndex].targetReps = $0 }
+            get: { hasTarget(roundIndex, exIndex) ? draft.rounds[roundIndex].targets[exIndex].targetReps ?? 8 : 8 },
+            set: { if hasTarget(roundIndex, exIndex) { draft.rounds[roundIndex].targets[exIndex].targetReps = $0 } }
         )
     }
 
     private func binding(time roundIndex: Int, _ exIndex: Int) -> Binding<Int> {
         Binding(
-            get: { draft.rounds[roundIndex].targets[exIndex].targetTime ?? 30 },
-            set: { draft.rounds[roundIndex].targets[exIndex].targetTime = $0 }
+            get: { hasTarget(roundIndex, exIndex) ? draft.rounds[roundIndex].targets[exIndex].targetTime ?? 30 : 30 },
+            set: { if hasTarget(roundIndex, exIndex) { draft.rounds[roundIndex].targets[exIndex].targetTime = $0 } }
         )
     }
 
     private func binding(effort roundIndex: Int, _ exIndex: Int) -> Binding<Double> {
         Binding(
-            get: { draft.rounds[roundIndex].targets[exIndex].effortLevel },
-            set: { draft.rounds[roundIndex].targets[exIndex].effortLevel = $0 }
+            get: { hasTarget(roundIndex, exIndex) ? draft.rounds[roundIndex].targets[exIndex].effortLevel : 0 },
+            set: { if hasTarget(roundIndex, exIndex) { draft.rounds[roundIndex].targets[exIndex].effortLevel = $0 } }
         )
     }
 
     private func binding(weight roundIndex: Int, _ exIndex: Int) -> Binding<String> {
         Binding(
             get: {
-                if let w = draft.rounds[roundIndex].targets[exIndex].targetWeight, w > 0 {
+                if hasTarget(roundIndex, exIndex),
+                   let w = draft.rounds[roundIndex].targets[exIndex].targetWeight, w > 0 {
                     return w.weightFormatted
                 }
                 return ""
             },
-            set: { draft.rounds[roundIndex].targets[exIndex].targetWeight = Double($0) }
+            set: {
+                guard hasTarget(roundIndex, exIndex) else { return }
+                draft.rounds[roundIndex].targets[exIndex].targetWeight =
+                    Double($0.replacingOccurrences(of: ",", with: "."))
+            }
         )
     }
 
     private func binding(isTimeBased index: Int) -> Binding<Bool> {
         Binding(
-            get: { draft.exercises[index].isTimeBased },
-            set: { draft.exercises[index].isTimeBased = $0 }
+            get: { index < draft.exercises.count && draft.exercises[index].isTimeBased },
+            set: { if index < draft.exercises.count { draft.exercises[index].isTimeBased = $0 } }
         )
     }
 

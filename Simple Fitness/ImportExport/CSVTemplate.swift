@@ -33,6 +33,21 @@ enum CSVTemplate {
     4,Plank,core,true,1,60,,,45
     4,Plank,core,true,2,45,,,45
 
+    # ============ CARDIO TEMPLATE ============
+    # One row per segment. intensity: easy/moderate/hard/max/rest (rest = a recovery segment).
+    #   duration & pace are MM:SS; distance is decimal; incline is percent (hills).
+    #   structure: steady / intervals / fartlek / hills / tempo / progression
+    #! cardio v1
+    #: name = Tuesday Hills
+    #: type = running
+    #: structure = hills
+    segment,label,intensity,duration,distance,pace,incline
+    1,Warmup,easy,10:00,,,
+    2,Hill,hard,1:00,,,6
+    3,Recovery,rest,2:00,,,
+    4,Hill,hard,1:00,,,6
+    5,Cooldown,easy,10:00,,,
+
     # ============ PROGRAM ============
     # Columns: week,day,type,name
     #   day  — monday..sunday    type — workout or cardio
@@ -45,8 +60,10 @@ enum CSVTemplate {
     #: difficulty = intermediate
     week,day,type,name
     1,monday,workout,Sample Push Day
+    1,wednesday,cardio,Tuesday Hills
     1,thursday,workout,Sample Push Day
     2,monday,workout,Sample Push Day
+    2,wednesday,cardio,Tuesday Hills
     2,thursday,workout,Sample Push Day
     """
 }

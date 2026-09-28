@@ -36,9 +36,12 @@ struct AppNavigation: View {
     }
 
     private func seedIfNeeded() {
+        let manager = SeedDataManager(context: modelContext)
         #if DEBUG
-        SeedDataManager(context: modelContext).seedIfNeeded()
+        manager.seedIfNeeded()
         #endif
+        // Runs in release too: fixes v1.0 workouts that migrated without rounds.
+        manager.repairLegacyWorkouts()
     }
 }
 

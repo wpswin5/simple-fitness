@@ -212,8 +212,10 @@ struct LogCardioView: View {
                 .tint(Color.sfAccent)
 
             if isIntervalWorkout {
-                ForEach($splits) { $split in
-                    SplitRowView(split: $split, distanceUnit: distanceUnit)
+                ForEach(splits) { split in
+                    if let i = splits.firstIndex(where: { $0.id == split.id }) {
+                        SplitRowView(split: $splits[i], distanceUnit: distanceUnit)
+                    }
                 }
                 .onDelete { splits.remove(atOffsets: $0) }
 
@@ -239,8 +241,10 @@ struct LogCardioView: View {
 
     private var swimSetsSection: some View {
         Section {
-            ForEach($swimSets) { $set in
-                SwimSetRowView(entry: $set)
+            ForEach(swimSets) { set in
+                if let i = swimSets.firstIndex(where: { $0.id == set.id }) {
+                    SwimSetRowView(entry: $swimSets[i])
+                }
             }
             .onDelete { swimSets.remove(atOffsets: $0) }
 

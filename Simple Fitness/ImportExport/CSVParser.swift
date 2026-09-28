@@ -163,7 +163,7 @@ enum CSVParser {
         var fields: [String] = []
         var field = ""
         var inQuotes = false
-        var chars = Array(record)
+        let chars = Array(record)
         var i = 0
         while i < chars.count {
             let c = chars[i]
@@ -203,6 +203,6 @@ enum CSVParser {
 
     /// Joins already-encoded fields into a CSV line.
     static func encodeRow(_ fields: [String]) -> String {
-        fields.map(encodeField).joined(separator: ",")
+        fields.map { encodeField($0) }.joined(separator: ",")
     }
 }

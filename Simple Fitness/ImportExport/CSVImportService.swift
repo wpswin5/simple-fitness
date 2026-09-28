@@ -21,10 +21,11 @@ enum CSVImportService {
 
     struct StagedImport {
         var workoutNames: [String]
+        var cardioTemplates: [String] = []
         var programs: [ProgramSummary]
         var issues: [ImportIssue]
         var hasErrors: Bool { issues.hasErrors }
-        var isEmpty: Bool { workoutNames.isEmpty && programs.isEmpty }
+        var isEmpty: Bool { workoutNames.isEmpty && cardioTemplates.isEmpty && programs.isEmpty }
     }
 
     /// Builds the object graph in a dedicated child context (autosave off) and
@@ -76,10 +77,27 @@ enum CSVImportService {
         }
         for w in builtWorkouts { workoutLookup[ExerciseResolver.normalize(w.name)] = w }
 
-        let cardioLookup: [String: CardioTemplate] = Dictionary(
+        var cardioLookup: [String: CardioTemplate] = Dictionary(
             existingCardio.map { (ExerciseResolver.normalize($0.name.isEmpty ? $0.displayName : $0.name), $0) },
             uniquingKeysWith: { first, _ in first }
         )
+
+        // Decode + build cardio template sections BEFORE programs, so a program's
+        // `cardio` rows can reference freshly-imported templates as well as existing ones.
+        let importUnit = DistanceUnit(rawValue: UserDefaults.standard.string(forKey: "distanceUnit") ?? "") ?? .miles
+        var builtCardioNames: [String] = []
+        for section in doc.sections where section.type == "cardio" {
+            let (parsed, cIssues) = CardioCSV.decode(section, distanceUnit: importUnit)
+            issues.append(contentsOf: cIssues)
+            guard let parsed else { continue }
+            let key = ExerciseResolver.normalize(parsed.name)
+            if replaceExisting {
+                for t in existingCardio where ExerciseResolver.normalize(t.name) == key { context.delete(t) }
+            }
+            let template = buildCardioTemplate(parsed, context: context)
+            cardioLookup[key] = template
+            builtCardioNames.append(template.name)
+        }
 
         // Decode + build program sections.
         var programSummaries: [ProgramSummary] = []
@@ -97,11 +115,16 @@ enum CSVImportService {
             programSummaries.append(ProgramSummary(name: parsed.name, weeks: parsed.weeks.count, activeDays: activeDays))
         }
 
-        for section in doc.sections where section.type != "workout" && section.type != "program" {
+        for section in doc.sections where !["workout", "cardio", "program"].contains(section.type) {
             issues.append(.warning("Ignored unknown section type '\(section.type)'", line: section.directiveLine))
         }
 
-        let summary = StagedImport(workoutNames: builtWorkouts.map(\.name), programs: programSummaries, issues: issues)
+        let summary = StagedImport(
+            workoutNames: builtWorkouts.map(\.name),
+            cardioTemplates: builtCardioNames,
+            programs: programSummaries,
+            issues: issues
+        )
         return (summary, context)
     }
 
@@ -201,6 +224,30 @@ enum CSVImportService {
 
         context.insert(program)
         return program
+    }
+
+    private static func buildCardioTemplate(_ parsed: ParsedCardioTemplate, context: ModelContext) -> CardioTemplate {
+        let t = CardioTemplate(cardioType: parsed.cardioType, name: parsed.name, isTemplate: true)
+        t.structureType = parsed.structureType
+        t.targetDistance = parsed.targetDistance
+        t.targetDurationSeconds = parsed.targetDurationSeconds
+        t.distanceUnit = parsed.distanceUnit
+        t.isIntervalWorkout = parsed.structureType.isSegmented && !parsed.segments.isEmpty
+        t.notes = parsed.notes
+        t.intervals = parsed.segments.enumerated().map { i, seg in
+            let iv = CardioTemplateInterval(order: i)
+            iv.label = seg.label
+            iv.isRest = seg.isRest
+            iv.intensity = seg.intensity
+            iv.durationSeconds = seg.durationSeconds
+            iv.distanceValue = seg.distanceValue
+            iv.paceSecondsPerUnit = seg.paceSecondsPerUnit
+            iv.inclinePercent = seg.inclinePercent
+            context.insert(iv)
+            return iv
+        }
+        context.insert(t)
+        return t
     }
 
     /// Same heuristic as CreateWorkoutViewModel.estimatedDurationMinutes.
