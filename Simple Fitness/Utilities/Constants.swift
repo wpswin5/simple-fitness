@@ -115,10 +115,13 @@ extension Double {
 }
 
 extension Int {
-    /// Format seconds as M:SS
+    /// Format seconds as M:SS, or H:MM:SS once an hour or longer.
     var timerFormatted: String {
-        let m = self / 60
-        let s = self % 60
+        let total = Swift.max(0, self)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
         return String(format: "%d:%02d", m, s)
     }
 }

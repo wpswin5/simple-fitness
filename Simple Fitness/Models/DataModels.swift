@@ -436,11 +436,7 @@ final class WorkoutLog {
         self.startDate = startDate
     }
 
-    var durationFormatted: String {
-        let minutes = durationSeconds / 60
-        let seconds = durationSeconds % 60
-        return String(format: "%d:%02d", minutes, seconds)
-    }
+    var durationFormatted: String { durationSeconds.timerFormatted }
 }
 
 @Model
